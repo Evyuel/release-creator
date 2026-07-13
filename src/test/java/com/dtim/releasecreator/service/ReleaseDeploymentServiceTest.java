@@ -47,7 +47,6 @@ class ReleaseDeploymentServiceTest {
         TeamCityProperties properties = new TeamCityProperties(
                 URI.create("http://teamcity"),
                 "token",
-                "MYPROJ_{repository}_Release",
                 Duration.ofSeconds(1),
                 Duration.ofHours(1),
                 Map.of("alpha", "MYPROJ_Alpha_Deploy_Uat"));
@@ -56,6 +55,7 @@ class ReleaseDeploymentServiceTest {
                 releaseRepositoryProvider,
                 properties,
                 teamCityClient,
+                new ProductionReleaseBuildService(),
                 reportWriter);
     }
 
@@ -68,11 +68,11 @@ class ReleaseDeploymentServiceTest {
                 "release/180.0.0", "http://teamcity/201");
         when(releaseRepositoryProvider.getRepositoriesForRelease())
                 .thenReturn(List.of("alpha", "beta", "gamma"));
-        when(teamCityClient.findLatestSuccessfulBuild("MYPROJ_alpha_Release", "release/180.0.0"))
+        when(teamCityClient.findLatestSuccessfulBuild("Alpha_Deployment_ReleaseProduction", "release/180.0.0"))
                 .thenReturn(Optional.of(alphaSource));
-        when(teamCityClient.findLatestSuccessfulBuild("MYPROJ_beta_Release", "release/180.0.0"))
+        when(teamCityClient.findLatestSuccessfulBuild("Beta_Deployment_ReleaseProduction", "release/180.0.0"))
                 .thenReturn(Optional.empty());
-        when(teamCityClient.findLatestSuccessfulBuild("MYPROJ_gamma_Release", "release/180.0.0"))
+        when(teamCityClient.findLatestSuccessfulBuild("Gamma_Deployment_ReleaseProduction", "release/180.0.0"))
                 .thenReturn(Optional.of(gammaSource));
         when(teamCityClient.triggerUatDeployBuild(
                 "MYPROJ_Alpha_Deploy_Uat", "release/180.0.0", "alpha", "180.0.0", alphaSource))
@@ -114,7 +114,7 @@ class ReleaseDeploymentServiceTest {
         TeamCityBuild source = build(101, "180.0.0.15");
         TeamCityBuild deployment = new TeamCityBuild(201, "queued", "UNKNOWN", "http://teamcity/201");
         when(releaseRepositoryProvider.getRepositoriesForRelease()).thenReturn(List.of("alpha"));
-        when(teamCityClient.findLatestSuccessfulBuild("MYPROJ_alpha_Release", "release/180.0.0"))
+        when(teamCityClient.findLatestSuccessfulBuild("Alpha_Deployment_ReleaseProduction", "release/180.0.0"))
                 .thenReturn(Optional.of(source));
         when(teamCityClient.triggerUatDeployBuild(
                 "MYPROJ_Alpha_Deploy_Uat", "release/180.0.0", "alpha", "180.0.0", source))
