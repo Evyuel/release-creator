@@ -14,17 +14,5 @@ public record TeamCityProperties(
         @NotNull URI baseUrl,
         String token,
         @NotNull Duration pollInterval,
-        @NotNull Duration waitTimeout,
-        Map<String, String> uatDeployBuildTypeByRepo) {
-
-    public TeamCityProperties {
-        uatDeployBuildTypeByRepo = uatDeployBuildTypeByRepo == null
-                ? Map.of()
-                : Map.copyOf(uatDeployBuildTypeByRepo);
-    }
-
-    public Optional<String> uatDeployBuildTypeId(String repository) {
-        return Optional.ofNullable(uatDeployBuildTypeByRepo.get(repository))
-                .filter(value -> !value.isBlank());
-    }
+        @NotNull Duration waitTimeout) {
 }

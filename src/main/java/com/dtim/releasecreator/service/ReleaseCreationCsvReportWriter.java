@@ -4,6 +4,8 @@ import com.dtim.releasecreator.dto.ReleaseResult;
 import com.dtim.releasecreator.dto.RepositoryReleaseResult;
 import com.dtim.releasecreator.dto.RepositoryReleaseStatus;
 import com.dtim.releasecreator.exception.ReleaseReportException;
+import org.springframework.stereotype.Component;
+
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,8 +16,6 @@ import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 @Component
 public class ReleaseCreationCsvReportWriter {
@@ -25,18 +25,8 @@ public class ReleaseCreationCsvReportWriter {
             + "initialBuildId;retryBuildId;buildRetried;errorMessage";
     private static final DateTimeFormatter FILE_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
-    private final Path reportDirectory;
-    private final Clock clock;
-
-    @Autowired
-    public ReleaseCreationCsvReportWriter() {
-        this(Path.of("reports", "releases"), Clock.systemDefaultZone());
-    }
-
-    ReleaseCreationCsvReportWriter(Path reportDirectory, Clock clock) {
-        this.reportDirectory = reportDirectory;
-        this.clock = clock;
-    }
+    private final Path reportDirectory = Path.of("reports", "releases");
+    private final Clock clock = Clock.systemDefaultZone();
 
     public Path writeReleaseCreationReport(ReleaseResult result) {
         Path temporaryFile = null;

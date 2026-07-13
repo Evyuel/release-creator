@@ -26,7 +26,6 @@ public class ReleaseDeploymentService {
 
     private final ReleaseVersionValidator releaseVersionValidator;
     private final ReleaseRepositoryProvider releaseRepositoryProvider;
-    private final TeamCityProperties teamCityProperties;
     private final TeamCityClient teamCityClient;
     private final ProductionReleaseBuildService productionReleaseBuildService;
     private final ReleaseDeploymentCsvReportWriter reportWriter;
@@ -34,13 +33,11 @@ public class ReleaseDeploymentService {
     public ReleaseDeploymentService(
             ReleaseVersionValidator releaseVersionValidator,
             ReleaseRepositoryProvider releaseRepositoryProvider,
-            TeamCityProperties teamCityProperties,
             TeamCityClient teamCityClient,
             ProductionReleaseBuildService productionReleaseBuildService,
             ReleaseDeploymentCsvReportWriter reportWriter) {
         this.releaseVersionValidator = releaseVersionValidator;
         this.releaseRepositoryProvider = releaseRepositoryProvider;
-        this.teamCityProperties = teamCityProperties;
         this.teamCityClient = teamCityClient;
         this.productionReleaseBuildService = productionReleaseBuildService;
         this.reportWriter = reportWriter;
@@ -90,7 +87,7 @@ public class ReleaseDeploymentService {
                 return failed(repository, "Source buildTypeId is not configured for repo: " + repository);
             }
 
-            log.info("[1/3] Searching latest successful TeamCity build for branch {}", releaseBranch);
+            log.info("[1/1] Searching latest successful TeamCity build for branch {}", releaseBranch);
             Optional<TeamCityBuild> sourceBuildOptional =
                     teamCityClient.findLatestSuccessfulBuild(sourceBuildTypeId, releaseBranch);
             if (sourceBuildOptional.isEmpty()) {
@@ -99,19 +96,9 @@ public class ReleaseDeploymentService {
             sourceBuild = sourceBuildOptional.get();
             log.info("[OK] Source build found: id={}, number={}", sourceBuild.id(), sourceBuild.number());
 
-            log.info("[2/3] Resolving UAT deploy build configuration");
-            Optional<String> deployBuildTypeId = teamCityProperties.uatDeployBuildTypeId(repository);
-            if (deployBuildTypeId.isEmpty()) {
-                return failed(
-                        repository,
-                        sourceBuild,
-                        "UAT deploy buildTypeId is not configured for repo: " + repository);
-            }
-            log.info("[OK] UAT deploy buildTypeId: {}", deployBuildTypeId.get());
-
-            log.info("[3/3] Triggering UAT deploy build");
+            log.info("[2/2] Triggering UAT deploy build");
             TeamCityBuild deploymentBuild = teamCityClient.triggerUatDeployBuild(
-                    deployBuildTypeId.get(),
+                    productionReleaseBuildService.getTST1DeployTypeForRepo(repository),
                     releaseBranch,
                     repository,
                     releaseVersion,
@@ -129,14 +116,6 @@ public class ReleaseDeploymentService {
     private ServiceDeploymentResult failed(String repository, String message) {
         log.error("[FAILED] {}", message);
         return ServiceDeploymentResult.failed(repository, message);
-    }
-
-    private ServiceDeploymentResult failed(
-            String repository,
-            TeamCityBuild sourceBuild,
-            String message) {
-        log.error("[FAILED] {}", message);
-        return ServiceDeploymentResult.failed(repository, sourceBuild, message);
     }
 
     private ReleaseDeploymentResult writeReport(ReleaseDeploymentResult result) {

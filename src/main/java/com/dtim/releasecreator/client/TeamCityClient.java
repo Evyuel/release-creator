@@ -46,7 +46,7 @@ public class TeamCityClient {
 
     public TeamCityBuild triggerBuild(String repository, String branchName) {
         Map<String, Object> body = Map.of(
-                "buildType", Map.of("id", productionReleaseBuildService.getBuildTypeForRepo(repository)),
+                "buildType", Map.of("id", productionReleaseBuildService.getReleaseProductionTypeForRepo(repository)),
                 "branchName", branchName);
         try {
             JsonNode response = restClient.post()

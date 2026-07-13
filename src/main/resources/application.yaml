@@ -6,21 +6,21 @@ server:
   port: ${SERVER_PORT:8080}
 
 integrations:
-  # Add repository slugs as a YAML list; an empty list includes every active repository.
-  excluded-repositories: []
   bitbucket:
-    base-url: ${BITBUCKET_BASE_URL:http://localhost:7990}
+    base-url: http://localhost:7990
     username: ${BITBUCKET_USERNAME:}
     token: ${BITBUCKET_TOKEN:}
-    project-key: ${BITBUCKET_PROJECT_KEY:MYPROJ}
-    develop-branch: ${BITBUCKET_DEVELOP_BRANCH:develop}
-    master-branch: ${BITBUCKET_MASTER_BRANCH:master}
+    project-key: MYPROJ
+    develop-branch: develop
+    master-branch: master
   teamcity:
-    base-url: ${TEAMCITY_BASE_URL:http://localhost:8111}
+    base-url: http://localhost:8111
     token: ${TEAMCITY_TOKEN:}
-    poll-interval: ${TEAMCITY_POLL_INTERVAL:5s}
-    wait-timeout: ${TEAMCITY_WAIT_TIMEOUT:2h}
-    uat-deploy-build-type-by-repo: {}
+    poll-interval: 60s
+    wait-timeout: 5h
+  excluded-repositories:
+    - "service1"
+    - "service2"
 
 logging:
   level:

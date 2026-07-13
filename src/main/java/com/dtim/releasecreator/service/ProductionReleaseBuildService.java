@@ -12,15 +12,36 @@ public class ProductionReleaseBuildService {
     /**
      * Some Release Production build configurations do not follow the common naming convention.
      */
-    private static final Map<String, String> EXCEPTIONS = Map.of(
+    private static final Map<String, String> REL_PROD_EXCEPTIONS = Map.of(
             "service1", "ser1_ReleaseProduction",
             "service2", "service_2_ReleaseProduction");
 
-    public String getBuildTypeForRepo(String repository) {
-        if (EXCEPTIONS.containsKey(repository)) {
-            return EXCEPTIONS.get(repository);
+    private static final Map<String, String> BUILD_EXCEPTIONS = Map.of(
+            "service1", "ser1_Build",
+            "service2", "service_2_Build");
+
+    private static final Map<String, String> TST1_DEPLOY_EXCEPTIONS = Map.of(
+            "service1", "ser1_DeployTST1",
+            "service2", "service_2_DeployTST1");
+
+    public String getReleaseProductionTypeForRepo(String repository) {
+        if (REL_PROD_EXCEPTIONS.containsKey(repository)) {
+            return REL_PROD_EXCEPTIONS.get(repository);
         }
         return String.format("%s_Deployment_ReleaseProduction", toPascalCase(repository));
+    }
+    public String getBuildTypeForRepo(String repository) {
+        if (BUILD_EXCEPTIONS.containsKey(repository)) {
+            return BUILD_EXCEPTIONS.get(repository);
+        }
+        return String.format("%s_Module_Build", toPascalCase(repository));
+    }
+
+    public String getTST1DeployTypeForRepo(String repository) {
+        if (TST1_DEPLOY_EXCEPTIONS.containsKey(repository)) {
+            return TST1_DEPLOY_EXCEPTIONS.get(repository);
+        }
+        return String.format("%s_Deployment_DeployIntegration", toPascalCase(repository));
     }
 
     private String toPascalCase(String value) {
