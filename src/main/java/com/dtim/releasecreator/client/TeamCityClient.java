@@ -2,6 +2,7 @@ package com.dtim.releasecreator.client;
 
 import com.dtim.releasecreator.config.TeamCityProperties;
 import com.dtim.releasecreator.exception.IntegrationException;
+import com.dtim.releasecreator.service.ProductionReleaseBuildService;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,15 +19,22 @@ import org.springframework.web.client.RestClientException;
 public class TeamCityClient {
 
     private final TeamCityProperties properties;
+    private final ProductionReleaseBuildService productionReleaseBuildService;
     private final RestClient restClient;
 
     @Autowired
-    public TeamCityClient(TeamCityProperties properties) {
-        this(properties, RestClient.builder());
+    public TeamCityClient(
+            TeamCityProperties properties,
+            ProductionReleaseBuildService productionReleaseBuildService) {
+        this(properties, productionReleaseBuildService, RestClient.builder());
     }
 
-    TeamCityClient(TeamCityProperties properties, RestClient.Builder restClientBuilder) {
+    TeamCityClient(
+            TeamCityProperties properties,
+            ProductionReleaseBuildService productionReleaseBuildService,
+            RestClient.Builder restClientBuilder) {
         this.properties = properties;
+        this.productionReleaseBuildService = productionReleaseBuildService;
         RestClient.Builder builder = restClientBuilder
                 .baseUrl(properties.baseUrl().toString())
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
@@ -38,7 +46,7 @@ public class TeamCityClient {
 
     public TeamCityBuild triggerBuild(String repository, String branchName) {
         Map<String, Object> body = Map.of(
-                "buildType", Map.of("id", properties.buildTypeId(repository)),
+                "buildType", Map.of("id", productionReleaseBuildService.getBuildTypeForRepo(repository)),
                 "branchName", branchName);
         try {
             JsonNode response = restClient.post()

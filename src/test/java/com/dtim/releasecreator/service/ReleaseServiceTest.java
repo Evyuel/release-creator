@@ -12,12 +12,14 @@ import com.dtim.releasecreator.client.PullRequestInfo;
 import com.dtim.releasecreator.client.TeamCityBuild;
 import com.dtim.releasecreator.client.TeamCityClient;
 import com.dtim.releasecreator.config.TeamCityProperties;
+import com.dtim.releasecreator.config.IntegrationsProperties;
 import com.dtim.releasecreator.dto.ReleaseResult;
 import com.dtim.releasecreator.dto.ReleaseStatus;
 import com.dtim.releasecreator.dto.RepositoryReleaseStatus;
 import com.dtim.releasecreator.exception.InvalidReleaseNumberException;
 import com.dtim.releasecreator.exception.ReleaseBranchConflictException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +37,9 @@ class ReleaseServiceTest {
     @Mock
     private TeamCityClient teamCityClient;
 
+    @Mock
+    private ReleaseCreationCsvReportWriter reportWriter;
+
     private ReleaseService releaseService;
 
     @BeforeEach
@@ -42,16 +47,18 @@ class ReleaseServiceTest {
         TeamCityProperties properties = new TeamCityProperties(
                 URI.create("http://teamcity"),
                 "token",
-                "MYPROJ_{repository}_Release",
                 Duration.ofMillis(1),
                 Duration.ofSeconds(2),
                 java.util.Map.of());
+        org.mockito.Mockito.lenient().when(reportWriter.writeReleaseCreationReport(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Path.of("reports", "releases", "release.csv"));
         releaseService = new ReleaseService(
                 bitbucketClient,
                 teamCityClient,
                 properties,
                 new ReleaseVersionValidator(),
-                new ReleaseRepositoryProvider(bitbucketClient));
+                new ReleaseRepositoryProvider(bitbucketClient, new IntegrationsProperties(List.of())),
+                reportWriter);
     }
 
     @Test

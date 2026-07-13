@@ -28,6 +28,7 @@ public class ReleaseDeploymentService {
     private final ReleaseRepositoryProvider releaseRepositoryProvider;
     private final TeamCityProperties teamCityProperties;
     private final TeamCityClient teamCityClient;
+    private final ProductionReleaseBuildService productionReleaseBuildService;
     private final ReleaseDeploymentCsvReportWriter reportWriter;
 
     public ReleaseDeploymentService(
@@ -35,11 +36,13 @@ public class ReleaseDeploymentService {
             ReleaseRepositoryProvider releaseRepositoryProvider,
             TeamCityProperties teamCityProperties,
             TeamCityClient teamCityClient,
+            ProductionReleaseBuildService productionReleaseBuildService,
             ReleaseDeploymentCsvReportWriter reportWriter) {
         this.releaseVersionValidator = releaseVersionValidator;
         this.releaseRepositoryProvider = releaseRepositoryProvider;
         this.teamCityProperties = teamCityProperties;
         this.teamCityClient = teamCityClient;
+        this.productionReleaseBuildService = productionReleaseBuildService;
         this.reportWriter = reportWriter;
     }
 
@@ -82,7 +85,7 @@ public class ReleaseDeploymentService {
             log.info("UAT DEPLOYMENT: {}", repository);
             log.info(REPOSITORY_SEPARATOR);
 
-            String sourceBuildTypeId = teamCityProperties.buildTypeId(repository);
+            String sourceBuildTypeId = productionReleaseBuildService.getBuildTypeForRepo(repository);
             if (sourceBuildTypeId.isBlank()) {
                 return failed(repository, "Source buildTypeId is not configured for repo: " + repository);
             }

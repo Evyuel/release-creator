@@ -13,9 +13,11 @@ import com.dtim.releasecreator.exception.ReleaseBranchConflictException;
 import com.dtim.releasecreator.exception.ReleaseInProgressException;
 import java.time.Duration;
 import java.time.Instant;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -33,6 +35,7 @@ public class ReleaseService {
     private final TeamCityProperties teamCityProperties;
     private final ReleaseVersionValidator releaseVersionValidator;
     private final ReleaseRepositoryProvider releaseRepositoryProvider;
+    private final ReleaseCreationCsvReportWriter reportWriter;
     private final AtomicBoolean releaseInProgress = new AtomicBoolean(false);
 
     public ReleaseService(
@@ -40,12 +43,14 @@ public class ReleaseService {
             TeamCityClient teamCityClient,
             TeamCityProperties teamCityProperties,
             ReleaseVersionValidator releaseVersionValidator,
-            ReleaseRepositoryProvider releaseRepositoryProvider) {
+            ReleaseRepositoryProvider releaseRepositoryProvider,
+            ReleaseCreationCsvReportWriter reportWriter) {
         this.bitbucketClient = bitbucketClient;
         this.teamCityClient = teamCityClient;
         this.teamCityProperties = teamCityProperties;
         this.releaseVersionValidator = releaseVersionValidator;
         this.releaseRepositoryProvider = releaseRepositoryProvider;
+        this.reportWriter = reportWriter;
     }
 
     public ReleaseResult createRelease(String releaseNumber) {
@@ -54,6 +59,7 @@ public class ReleaseService {
         }
 
         Instant startedAt = Instant.now();
+        String operationId = UUID.randomUUID().toString().substring(0, 8);
         try (MDC.MDCCloseable ignored = MDC.putCloseable("releaseNumber", releaseNumber)) {
             log.info(SEPARATOR);
             log.info("RELEASE STARTED | releaseNumber={}", releaseNumber);
@@ -71,7 +77,8 @@ public class ReleaseService {
 
             waitForBuilds(executions, branchName);
             Instant finishedAt = Instant.now();
-            ReleaseResult result = toResult(releaseNumber, startedAt, finishedAt, executions);
+            ReleaseResult result = toResult(operationId, releaseNumber, startedAt, finishedAt, executions);
+            result = writeReport(result);
             logSummary(result);
             return result;
         } finally {
@@ -214,6 +221,7 @@ public class ReleaseService {
     }
 
     private ReleaseResult toResult(
+            String operationId,
             String releaseNumber,
             Instant startedAt,
             Instant finishedAt,
@@ -233,12 +241,26 @@ public class ReleaseService {
                 ? ReleaseStatus.SUCCESS
                 : successes == 0 ? ReleaseStatus.FAILURE : ReleaseStatus.PARTIAL_FAILURE;
         return new ReleaseResult(
+                operationId,
                 releaseNumber,
                 status,
                 startedAt,
                 finishedAt,
                 Duration.between(startedAt, finishedAt).toMillis(),
+                null,
                 repositories);
+    }
+
+    private ReleaseResult writeReport(ReleaseResult result) {
+        try {
+            Path report = reportWriter.writeReleaseCreationReport(result);
+            String reportPath = report.toString().replace('\\', '/');
+            log.info("RELEASE CSV REPORT WRITTEN | path={}", reportPath);
+            return result.withCsvReportPath(reportPath);
+        } catch (RuntimeException exception) {
+            log.error("RELEASE CSV REPORT FAILED | release result is preserved", exception);
+            return result;
+        }
     }
 
     private void logSummary(ReleaseResult result) {
@@ -254,8 +276,9 @@ public class ReleaseService {
                 .count();
         long retried = result.repositories().stream().filter(RepositoryReleaseResult::buildRetried).count();
         log.info(SEPARATOR);
-        log.info("RELEASE FINISHED | status={} durationMs={} repositories={} skipped={} succeeded={} failed={} retried={}",
-                result.status(), result.durationMillis(), result.repositories().size(), skipped, succeeded, failed, retried);
+        log.info("RELEASE FINISHED | operationId={} status={} durationMs={} repositories={} skipped={} succeeded={} failed={} retried={} csvReport={}",
+                result.operationId(), result.status(), result.durationMillis(), result.repositories().size(),
+                skipped, succeeded, failed, retried, result.csvReportPath());
         for (RepositoryReleaseResult repository : result.repositories()) {
             log.info("RELEASE RESULT | repository={} status={} branch={} pullRequestId={} buildIds={} retried={} error={}",
                     repository.repository(), repository.status(), repository.branchName(), repository.pullRequestId(),

@@ -7,6 +7,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -16,14 +19,20 @@ import org.springframework.web.client.RestClientException;
 @Component
 public class BitbucketClient {
 
+    private static final Logger log = LoggerFactory.getLogger(BitbucketClient.class);
     private static final int PAGE_SIZE = 100;
 
     private final BitbucketProperties properties;
     private final RestClient restClient;
 
+    @Autowired
     public BitbucketClient(BitbucketProperties properties) {
+        this(properties, RestClient.builder());
+    }
+
+    BitbucketClient(BitbucketProperties properties, RestClient.Builder restClientBuilder) {
         this.properties = properties;
-        RestClient.Builder builder = RestClient.builder()
+        RestClient.Builder builder = restClientBuilder
                 .baseUrl(properties.baseUrl().toString())
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
 
@@ -39,6 +48,7 @@ public class BitbucketClient {
 
     public List<String> getRepositoryNames() {
         List<String> repositories = new ArrayList<>();
+        int inactiveCount = 0;
         int start = 0;
         boolean lastPage;
 
@@ -51,6 +61,10 @@ public class BitbucketClient {
                     .build(properties.projectKey()));
 
             for (JsonNode repository : page.path("values")) {
+                if (!isActive(repository)) {
+                    inactiveCount++;
+                    continue;
+                }
                 String slug = repository.path("slug").asText();
                 if (!slug.isBlank()) {
                     repositories.add(slug);
@@ -60,7 +74,17 @@ public class BitbucketClient {
             start = page.path("nextPageStart").asInt(start + PAGE_SIZE);
         } while (!lastPage);
 
+        log.info("BITBUCKET ACTIVE REPOSITORIES LOADED | active={} inactiveFiltered={}",
+                repositories.size(), inactiveCount);
         return List.copyOf(repositories);
+    }
+
+    private boolean isActive(JsonNode repository) {
+        String state = repository.path("state").asText();
+        boolean stateAvailable = state.isBlank() || "AVAILABLE".equalsIgnoreCase(state);
+        boolean active = repository.path("active").asBoolean(true);
+        boolean archived = repository.path("archived").asBoolean(false);
+        return stateAvailable && active && !archived;
     }
 
     public boolean branchExists(String repository, String branchName) {
