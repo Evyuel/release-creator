@@ -9,7 +9,6 @@ import com.dtim.releasecreator.dto.ReleaseResult;
 import com.dtim.releasecreator.dto.ReleaseStatus;
 import com.dtim.releasecreator.dto.RepositoryReleaseResult;
 import com.dtim.releasecreator.dto.RepositoryReleaseStatus;
-import com.dtim.releasecreator.exception.InvalidReleaseNumberException;
 import com.dtim.releasecreator.exception.ReleaseBranchConflictException;
 import com.dtim.releasecreator.exception.ReleaseInProgressException;
 import java.time.Duration;
@@ -17,7 +16,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -27,25 +25,27 @@ import org.springframework.stereotype.Service;
 public class ReleaseService {
 
     private static final Logger log = LoggerFactory.getLogger(ReleaseService.class);
-    private static final Pattern RELEASE_NUMBER_PATTERN = Pattern.compile("^\\d{3}\\.\\d+\\.\\d+$");
     private static final String RELEASE_BRANCH_PREFIX = "release/";
     private static final String SEPARATOR = "================================================================================";
-
-    /* Add repository slugs to this list. It is intentionally maintained in code for now. */
-    private final List<String> ignoredRepositories = List.of();
 
     private final BitbucketClient bitbucketClient;
     private final TeamCityClient teamCityClient;
     private final TeamCityProperties teamCityProperties;
+    private final ReleaseVersionValidator releaseVersionValidator;
+    private final ReleaseRepositoryProvider releaseRepositoryProvider;
     private final AtomicBoolean releaseInProgress = new AtomicBoolean(false);
 
     public ReleaseService(
             BitbucketClient bitbucketClient,
             TeamCityClient teamCityClient,
-            TeamCityProperties teamCityProperties) {
+            TeamCityProperties teamCityProperties,
+            ReleaseVersionValidator releaseVersionValidator,
+            ReleaseRepositoryProvider releaseRepositoryProvider) {
         this.bitbucketClient = bitbucketClient;
         this.teamCityClient = teamCityClient;
         this.teamCityProperties = teamCityProperties;
+        this.releaseVersionValidator = releaseVersionValidator;
+        this.releaseRepositoryProvider = releaseRepositoryProvider;
     }
 
     public ReleaseResult createRelease(String releaseNumber) {
@@ -57,9 +57,10 @@ public class ReleaseService {
         try (MDC.MDCCloseable ignored = MDC.putCloseable("releaseNumber", releaseNumber)) {
             log.info(SEPARATOR);
             log.info("RELEASE STARTED | releaseNumber={}", releaseNumber);
-            validateReleaseNumber(releaseNumber);
+            releaseVersionValidator.validate(releaseNumber);
+            log.info("RELEASE VALIDATED | releaseNumber={}", releaseNumber);
 
-            List<String> repositories = getRepositoriesForRelease();
+            List<String> repositories = releaseRepositoryProvider.getRepositoriesForRelease();
             String branchName = RELEASE_BRANCH_PREFIX + releaseNumber;
             ensureReleaseBranchDoesNotExist(repositories, branchName);
 
@@ -76,29 +77,6 @@ public class ReleaseService {
         } finally {
             releaseInProgress.set(false);
         }
-    }
-
-    private void validateReleaseNumber(String releaseNumber) {
-        if (releaseNumber == null || !RELEASE_NUMBER_PATTERN.matcher(releaseNumber).matches()) {
-            log.error("RELEASE VALIDATION FAILED | releaseNumber={}", releaseNumber);
-            throw new InvalidReleaseNumberException(releaseNumber);
-        }
-        log.info("RELEASE VALIDATED | releaseNumber={}", releaseNumber);
-    }
-
-    private List<String> getRepositoriesForRelease() {
-        List<String> allRepositories = bitbucketClient.getRepositoryNames();
-        List<String> repositories = allRepositories.stream()
-                .filter(repository -> !ignoredRepositories.contains(repository))
-                .sorted()
-                .toList();
-        List<String> ignored = allRepositories.stream()
-                .filter(ignoredRepositories::contains)
-                .sorted()
-                .toList();
-        log.info("REPOSITORIES LOADED | total={} selected={} ignored={} ignoredRepositories={}",
-                allRepositories.size(), repositories.size(), ignored.size(), ignored);
-        return repositories;
     }
 
     private void ensureReleaseBranchDoesNotExist(List<String> repositories, String branchName) {
