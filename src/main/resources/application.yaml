@@ -19,6 +19,7 @@ integrations:
     build-type-id-pattern: ${TEAMCITY_BUILD_TYPE_ID_PATTERN:MYPROJ_{repository}_Release}
     poll-interval: ${TEAMCITY_POLL_INTERVAL:5s}
     wait-timeout: ${TEAMCITY_WAIT_TIMEOUT:2h}
+    uat-deploy-build-type-by-repo: {}
 
 logging:
   level:
