@@ -1,3 +1,28 @@
 spring:
   application:
     name: releasecreator
+
+server:
+  port: ${SERVER_PORT:8080}
+
+integrations:
+  bitbucket:
+    base-url: ${BITBUCKET_BASE_URL:http://localhost:7990}
+    username: ${BITBUCKET_USERNAME:}
+    token: ${BITBUCKET_TOKEN:}
+    project-key: ${BITBUCKET_PROJECT_KEY:MYPROJ}
+    develop-branch: ${BITBUCKET_DEVELOP_BRANCH:develop}
+    master-branch: ${BITBUCKET_MASTER_BRANCH:master}
+  teamcity:
+    base-url: ${TEAMCITY_BASE_URL:http://localhost:8111}
+    token: ${TEAMCITY_TOKEN:}
+    build-type-id-pattern: ${TEAMCITY_BUILD_TYPE_ID_PATTERN:MYPROJ_{repository}_Release}
+    poll-interval: ${TEAMCITY_POLL_INTERVAL:5s}
+    wait-timeout: ${TEAMCITY_WAIT_TIMEOUT:2h}
+
+logging:
+  level:
+    root: INFO
+    com.dtim.releasecreator: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [release=%X{releaseNumber:-}] [repo=%X{repository:-}] [%thread] %logger{36} - %msg%n"
