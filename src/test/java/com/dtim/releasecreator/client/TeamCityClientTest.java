@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.dtim.releasecreator.config.TeamCityProperties;
+import com.dtim.releasecreator.service.ProductionReleaseBuildService;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -33,11 +34,10 @@ class TeamCityClientTest {
         TeamCityProperties properties = new TeamCityProperties(
                 URI.create("http://teamcity"),
                 "secret-token",
-                "MYPROJ_{repository}_Release",
                 Duration.ofSeconds(1),
                 Duration.ofHours(1),
                 Map.of());
-        client = new TeamCityClient(properties, builder);
+        client = new TeamCityClient(properties, new ProductionReleaseBuildService(), builder);
     }
 
     @Test
