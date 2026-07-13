@@ -44,8 +44,14 @@ class ReleaseServiceTest {
                 "token",
                 "MYPROJ_{repository}_Release",
                 Duration.ofMillis(1),
-                Duration.ofSeconds(2));
-        releaseService = new ReleaseService(bitbucketClient, teamCityClient, properties);
+                Duration.ofSeconds(2),
+                java.util.Map.of());
+        releaseService = new ReleaseService(
+                bitbucketClient,
+                teamCityClient,
+                properties,
+                new ReleaseVersionValidator(),
+                new ReleaseRepositoryProvider(bitbucketClient));
     }
 
     @Test

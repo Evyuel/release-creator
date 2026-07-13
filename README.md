@@ -5,7 +5,7 @@ Local Spring Boot service that creates a release across all repositories in a Bi
 ## Workflow
 
 1. Validate a release number in `XXX.Y.Z` format, for example `180.0.0`.
-2. Load every repository from Bitbucket project `MYPROJ` and remove repositories from the hardcoded `ignoredRepositories` list in `ReleaseService`.
+2. Load every repository from Bitbucket project `MYPROJ` and remove repositories from the hardcoded `ignoredRepositories` list in `ReleaseRepositoryProvider`.
 3. Before making any changes, check every selected repository for `release/<number>`. If at least one branch exists, abort the entire release.
 4. For every repository:
    - skip it when there are no changes from `master` to `develop`;
@@ -37,6 +37,16 @@ All secrets and endpoints are provided through environment variables:
 
 The `{repository}` placeholder is replaced with the repository slug; hyphens are converted to underscores. Change the pattern if TeamCity uses another build configuration naming convention.
 
+UAT deploy build configurations are mapped explicitly by repository slug:
+
+```yaml
+integrations:
+  teamcity:
+    uat-deploy-build-type-by-repo:
+      my-calc-service: MyProj_MyCalcService_Deploy_Uat
+      orders-service: MyProj_OrdersService_Deploy_Uat
+```
+
 ## Run
 
 ```shell
@@ -50,5 +60,15 @@ curl -X POST http://localhost:8080/api/v1/releases \
   -H "Content-Type: application/json" \
   -d '{"releaseNumber":"180.0.0"}'
 ```
+
+Deploy release artifacts to UAT:
+
+```shell
+curl -X POST http://localhost:8080/api/releases/180.0.0/deployments/uat
+```
+
+The UAT endpoint finds the latest successful finished source build for each release branch and queues the configured deploy build with source-build parameters. It does not wait for deploy completion. A failure in one repository is returned for that repository without stopping the others.
+
+Every UAT deployment attempt also writes a UTF-8, semicolon-separated CSV report under `reports/deployments`. Values containing semicolons, quotes, or line breaks are CSV-escaped. If report writing fails, already queued deployments remain in the response and `csvReportPath` is `null`.
 
 Logs are written to STDOUT. Every line contains the release and repository MDC fields, and the final block contains a complete summary.
