@@ -5,7 +5,7 @@ Local Spring Boot service that creates a release across all repositories in a Bi
 ## Workflow
 
 1. Validate a release number in `XXX.Y.Z` format, for example `180.0.0`.
-2. Load every repository from Bitbucket project `MYPROJ` and remove repositories from the hardcoded `ignoredRepositories` list in `ReleaseRepositoryProvider`.
+2. Load only active repositories from Bitbucket project `MYPROJ` and remove repositories configured in `integrations.excluded-repositories`.
 3. Before making any changes, check every selected repository for `release/<number>`. If at least one branch exists, abort the entire release.
 4. For every repository:
    - skip it when there are no changes from `master` to `develop`;
@@ -13,7 +13,7 @@ Local Spring Boot service that creates a release across all repositories in a Bi
    - open a pull request into `master`;
    - queue its TeamCity build.
 5. Poll all queued builds. A failed build is queued one more time; no further retries are made.
-6. Return a per-repository result containing branch, pull request and build information.
+6. Write a new CSV report and return a per-repository result containing branch, pull request and build information.
 
 Only one release can run in one service instance at a time.
 
@@ -31,11 +31,19 @@ All secrets and endpoints are provided through environment variables:
 | `BITBUCKET_MASTER_BRANCH` | `master` |
 | `TEAMCITY_BASE_URL` | `http://localhost:8111` |
 | `TEAMCITY_TOKEN` | empty |
-| `TEAMCITY_BUILD_TYPE_ID_PATTERN` | `MYPROJ_{repository}_Release` |
 | `TEAMCITY_POLL_INTERVAL` | `5s` |
 | `TEAMCITY_WAIT_TIMEOUT` | `2h` |
 
-The `{repository}` placeholder is replaced with the repository slug; hyphens are converted to underscores. Change the pattern if TeamCity uses another build configuration naming convention.
+Excluded repositories are configured as a YAML list. They are removed before branch checks and are not used by either release creation or UAT deployment:
+
+```yaml
+integrations:
+  excluded-repositories:
+    - legacy-service
+    - archived-adapter
+```
+
+Production release build type IDs are resolved by `ProductionReleaseBuildService`. By default, a repository slug is converted to PascalCase and suffixed with `_Deployment_ReleaseProduction`, for example `order-payment_service` becomes `OrderPaymentService_Deployment_ReleaseProduction`. Non-standard TeamCity IDs are maintained in the service's `EXCEPTIONS` map.
 
 UAT deploy build configurations are mapped explicitly by repository slug:
 
@@ -71,4 +79,12 @@ The UAT endpoint finds the latest successful finished source build for each rele
 
 Every UAT deployment attempt also writes a UTF-8, semicolon-separated CSV report under `reports/deployments`. Values containing semicolons, quotes, or line breaks are CSV-escaped. If report writing fails, already queued deployments remain in the response and `csvReportPath` is `null`.
 
-Logs are written to STDOUT. Every line contains the release and repository MDC fields, and the final block contains a complete summary.
+Every release-creation attempt writes a separate UTF-8, semicolon-separated report under `reports/releases`, for example `release-creation-180.0.0-20260713-143015-a8f31c42.csv`. Its columns are:
+
+```text
+operationId;releaseVersion;releaseStatus;startedAt;finishedAt;durationMs;repoSlug;status;skipReason;releaseBranch;pullRequestId;pullRequestUrl;initialBuildId;retryBuildId;buildRetried;errorMessage
+```
+
+The response contains the generated path in `csvReportPath`. Report-writing failure does not discard the release result; in that case the path is `null` and the failure is logged.
+
+Logs are written both to colorized STDOUT and `logs/release-creator.log`. Every line contains the release and repository MDC fields. File logs are rotated daily or at 20 MB, retained for 30 days, and capped at 1 GB total.
