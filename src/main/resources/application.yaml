@@ -6,6 +6,8 @@ server:
   port: ${SERVER_PORT:8080}
 
 integrations:
+  # Add repository slugs as a YAML list; an empty list includes every active repository.
+  excluded-repositories: []
   bitbucket:
     base-url: ${BITBUCKET_BASE_URL:http://localhost:7990}
     username: ${BITBUCKET_USERNAME:}
@@ -16,7 +18,6 @@ integrations:
   teamcity:
     base-url: ${TEAMCITY_BASE_URL:http://localhost:8111}
     token: ${TEAMCITY_TOKEN:}
-    build-type-id-pattern: ${TEAMCITY_BUILD_TYPE_ID_PATTERN:MYPROJ_{repository}_Release}
     poll-interval: ${TEAMCITY_POLL_INTERVAL:5s}
     wait-timeout: ${TEAMCITY_WAIT_TIMEOUT:2h}
     uat-deploy-build-type-by-repo: {}
@@ -25,5 +26,3 @@ logging:
   level:
     root: INFO
     com.dtim.releasecreator: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [release=%X{releaseNumber:-}] [repo=%X{repository:-}] [%thread] %logger{36} - %msg%n"
