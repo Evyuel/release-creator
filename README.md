@@ -43,17 +43,7 @@ integrations:
     - archived-adapter
 ```
 
-Production release build type IDs are resolved by `ProductionReleaseBuildService`. By default, a repository slug is converted to PascalCase and suffixed with `_Deployment_ReleaseProduction`, for example `order-payment_service` becomes `OrderPaymentService_Deployment_ReleaseProduction`. Non-standard TeamCity IDs are maintained in the service's `EXCEPTIONS` map.
-
-UAT deploy build configurations are mapped explicitly by repository slug:
-
-```yaml
-integrations:
-  teamcity:
-    uat-deploy-build-type-by-repo:
-      my-calc-service: MyProj_MyCalcService_Deploy_Uat
-      orders-service: MyProj_OrdersService_Deploy_Uat
-```
+TeamCity build type IDs are resolved by `ProductionReleaseBuildService`. Repository slugs are converted to PascalCase and receive the suffix for the required operation: `_Deployment_ReleaseProduction`, `_Module_Build`, or `_Deployment_DeployIntegration`. Non-standard IDs are maintained in the corresponding exception maps in that service.
 
 ## Run
 
@@ -74,6 +64,18 @@ Deploy release artifacts to UAT:
 ```shell
 curl -X POST http://localhost:8080/api/releases/180.0.0/deployments/uat
 ```
+
+Finalize a release:
+
+```shell
+curl -X POST http://localhost:8080/api/v1/releases/181.0.0/finalize
+```
+
+Finalization processes the same active, non-excluded repository list as release creation. For each repository it finds the exact `release/<number> -> master` pull request, checks Bitbucket mergeability, merges it, then reuses or creates and merges a `master -> develop` pull request. A repository without a release pull request is skipped, while a repository-level failure is recorded without stopping the remaining repositories.
+
+The operation is idempotent: an already merged release pull request is recognized, an existing open `master -> develop` pull request is reused, and a repository with no remaining `master -> develop` changes is reported as already finalized or synchronized. Merge vetoes are not bypassed and merge operations are not automatically retried.
+
+Every completed finalization writes a separate UTF-8, semicolon-separated CSV report under `reports/release-finalizing`, for example `release-finalizing-181.0.0-20260715-132030-f82ab3c1.csv`. The response includes overall counters, PR identifiers and URLs, per-repository statuses, the failed step and `csvReportPath`. A CSV failure does not discard already completed Bitbucket operations.
 
 The UAT endpoint finds the latest successful finished source build for each release branch and queues the configured deploy build with source-build parameters. It does not wait for deploy completion. A failure in one repository is returned for that repository without stopping the others.
 
