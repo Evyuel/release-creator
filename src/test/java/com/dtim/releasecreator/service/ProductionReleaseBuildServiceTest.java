@@ -10,13 +10,13 @@ class ProductionReleaseBuildServiceTest {
 
     @Test
     void usesExplicitExceptions() {
-        assertThat(service.getBuildTypeForRepo("service1")).isEqualTo("ser1_ReleaseProduction");
-        assertThat(service.getBuildTypeForRepo("service2")).isEqualTo("service_2_ReleaseProduction");
+        assertThat(service.getReleaseProductionTypeForRepo("service1")).isEqualTo("ser1_ReleaseProduction");
+        assertThat(service.getReleaseProductionTypeForRepo("service2")).isEqualTo("service_2_ReleaseProduction");
     }
 
     @Test
     void buildsDefaultIdFromPascalCaseRepositorySlug() {
-        assertThat(service.getBuildTypeForRepo("order-payment_service"))
+        assertThat(service.getReleaseProductionTypeForRepo("order-payment_service"))
                 .isEqualTo("OrderPaymentService_Deployment_ReleaseProduction");
     }
 }
