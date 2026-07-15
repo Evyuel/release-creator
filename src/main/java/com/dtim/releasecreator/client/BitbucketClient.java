@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import org.springframework.web.util.UriBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,10 +106,14 @@ public class BitbucketClient {
     }
 
     public boolean hasChangesBetweenMasterAndDevelop(String repository) {
+        return hasChanges(repository, properties.masterBranch(), properties.developBranch());
+    }
+
+    public boolean hasChanges(String repository, String sinceBranch, String untilBranch) {
         JsonNode changes = get(uriBuilder -> uriBuilder
                 .path("/rest/api/1.0/projects/{projectKey}/repos/{repository}/changes")
-                .queryParam("since", "refs/heads/" + properties.masterBranch())
-                .queryParam("until", "refs/heads/" + properties.developBranch())
+                .queryParam("since", ref(sinceBranch))
+                .queryParam("until", ref(untilBranch))
                 .queryParam("limit", 1)
                 .build(properties.projectKey(), repository));
         return changes.path("values").size() > 0;
@@ -123,11 +129,26 @@ public class BitbucketClient {
     }
 
     public PullRequestInfo createPullRequest(String repository, String branchName, String releaseNumber) {
-        Map<String, Object> fromRef = repositoryRef(repository, "refs/heads/" + branchName);
-        Map<String, Object> toRef = repositoryRef(repository, "refs/heads/" + properties.masterBranch());
+        BitbucketPullRequest pullRequest = createPullRequest(
+                repository,
+                branchName,
+                properties.masterBranch(),
+                "Release " + releaseNumber + " for " + repository,
+                "Automated release pull request for " + releaseNumber + ".");
+        return new PullRequestInfo(pullRequest.id(), pullRequest.url());
+    }
+
+    public BitbucketPullRequest createPullRequest(
+            String repository,
+            String fromBranch,
+            String toBranch,
+            String title,
+            String description) {
+        Map<String, Object> fromRef = repositoryRef(repository, ref(fromBranch));
+        Map<String, Object> toRef = repositoryRef(repository, ref(toBranch));
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("title", "Release " + releaseNumber + " for " + repository);
-        body.put("description", "Automated release pull request for " + releaseNumber + ".");
+        body.put("title", title);
+        body.put("description", description);
         body.put("fromRef", fromRef);
         body.put("toRef", toRef);
         body.put("open", true);
@@ -136,13 +157,57 @@ public class BitbucketClient {
         JsonNode response = post(uriBuilder -> uriBuilder
                 .path("/rest/api/1.0/projects/{projectKey}/repos/{repository}/pull-requests")
                 .build(properties.projectKey(), repository), body);
-        long id = response.path("id").asLong();
-        String url = response.path("links").path("self").path(0).path("href").asText();
-        if (url.isBlank()) {
-            url = properties.baseUrl() + "/projects/" + properties.projectKey()
-                    + "/repos/" + repository + "/pull-requests/" + id;
+        return toPullRequest(repository, response);
+    }
+
+    public List<BitbucketPullRequest> findPullRequests(
+            String repository,
+            String fromBranch,
+            String toBranch) {
+        List<BitbucketPullRequest> pullRequests = new ArrayList<>();
+        int start = 0;
+        boolean lastPage;
+        String expectedFromRef = ref(fromBranch);
+        String expectedToRef = ref(toBranch);
+        do {
+            int pageStart = start;
+            JsonNode page = get(uriBuilder -> uriBuilder
+                    .path("/rest/api/1.0/projects/{projectKey}/repos/{repository}/pull-requests")
+                    .queryParam("state", "ALL")
+                    .queryParam("at", expectedToRef)
+                    .queryParam("direction", "INCOMING")
+                    .queryParam("limit", PAGE_SIZE)
+                    .queryParam("start", pageStart)
+                    .build(properties.projectKey(), repository));
+            for (JsonNode pullRequest : page.path("values")) {
+                BitbucketPullRequest parsed = toPullRequest(repository, pullRequest);
+                if (expectedFromRef.equals(parsed.fromRef()) && expectedToRef.equals(parsed.toRef())) {
+                    pullRequests.add(parsed);
+                }
+            }
+            lastPage = page.path("isLastPage").asBoolean(true);
+            start = page.path("nextPageStart").asInt(start + PAGE_SIZE);
+        } while (!lastPage);
+        return List.copyOf(pullRequests);
+    }
+
+    public BitbucketPullRequest mergePullRequest(String repository, BitbucketPullRequest pullRequest) {
+        JsonNode mergeability = get(uriBuilder -> uriBuilder
+                .path("/rest/api/1.0/projects/{projectKey}/repos/{repository}/pull-requests/{pullRequestId}/merge")
+                .build(properties.projectKey(), repository, pullRequest.id()));
+        if (!mergeability.path("canMerge").asBoolean(false)) {
+            String vetoes = mergeability.path("vetoes").findValuesAsText("summaryMessage").stream()
+                    .filter(message -> !message.isBlank())
+                    .distinct()
+                    .collect(java.util.stream.Collectors.joining("; "));
+            throw new IntegrationException("Pull request " + pullRequest.id() + " cannot be merged"
+                    + (vetoes.isBlank() ? "" : ": " + vetoes));
         }
-        return new PullRequestInfo(id, url);
+        JsonNode response = post(uriBuilder -> uriBuilder
+                .path("/rest/api/1.0/projects/{projectKey}/repos/{repository}/pull-requests/{pullRequestId}/merge")
+                .queryParam("version", pullRequest.version())
+                .build(properties.projectKey(), repository, pullRequest.id()), Map.of());
+        return toPullRequest(repository, response);
     }
 
     private Map<String, Object> repositoryRef(String repository, String refId) {
@@ -153,7 +218,27 @@ public class BitbucketClient {
                         "project", Map.of("key", properties.projectKey())));
     }
 
-    private JsonNode get(java.util.function.Function<org.springframework.web.util.UriBuilder, java.net.URI> uri) {
+    private BitbucketPullRequest toPullRequest(String repository, JsonNode response) {
+        long id = response.path("id").asLong();
+        String url = response.path("links").path("self").path(0).path("href").asText();
+        if (url.isBlank()) {
+            url = properties.baseUrl() + "/projects/" + properties.projectKey()
+                    + "/repos/" + repository + "/pull-requests/" + id;
+        }
+        return new BitbucketPullRequest(
+                id,
+                response.path("version").asInt(),
+                response.path("state").asText(),
+                response.path("fromRef").path("id").asText(),
+                response.path("toRef").path("id").asText(),
+                url);
+    }
+
+    private String ref(String branch) {
+        return branch.startsWith("refs/") ? branch : "refs/heads/" + branch;
+    }
+
+    private JsonNode get(Function<UriBuilder, java.net.URI> uri) {
         try {
             JsonNode response = restClient.get().uri(uri).retrieve().body(JsonNode.class);
             if (response == null) {
@@ -166,7 +251,7 @@ public class BitbucketClient {
     }
 
     private JsonNode post(
-            java.util.function.Function<org.springframework.web.util.UriBuilder, java.net.URI> uri,
+            Function<UriBuilder, java.net.URI> uri,
             Object body) {
         try {
             JsonNode response = restClient.post()
