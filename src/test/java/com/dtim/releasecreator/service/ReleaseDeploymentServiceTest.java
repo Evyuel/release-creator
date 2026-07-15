@@ -13,6 +13,7 @@ import com.dtim.releasecreator.config.TeamCityProperties;
 import com.dtim.releasecreator.dto.DeploymentStatus;
 import com.dtim.releasecreator.dto.ReleaseDeploymentResult;
 import com.dtim.releasecreator.exception.InvalidReleaseNumberException;
+import com.dtim.releasecreator.exception.IntegrationException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -44,16 +45,9 @@ class ReleaseDeploymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        TeamCityProperties properties = new TeamCityProperties(
-                URI.create("http://teamcity"),
-                "token",
-                Duration.ofSeconds(1),
-                Duration.ofHours(1),
-                Map.of("alpha", "MYPROJ_Alpha_Deploy_Uat"));
         service = new ReleaseDeploymentService(
                 releaseVersionValidator,
                 releaseRepositoryProvider,
-                properties,
                 teamCityClient,
                 new ProductionReleaseBuildService(),
                 reportWriter);
@@ -68,15 +62,18 @@ class ReleaseDeploymentServiceTest {
                 "release/180.0.0", "http://teamcity/201");
         when(releaseRepositoryProvider.getRepositoriesForRelease())
                 .thenReturn(List.of("alpha", "beta", "gamma"));
-        when(teamCityClient.findLatestSuccessfulBuild("Alpha_Deployment_ReleaseProduction", "release/180.0.0"))
+        when(teamCityClient.findLatestSuccessfulBuild("Alpha_Module_Build", "release/180.0.0"))
                 .thenReturn(Optional.of(alphaSource));
-        when(teamCityClient.findLatestSuccessfulBuild("Beta_Deployment_ReleaseProduction", "release/180.0.0"))
+        when(teamCityClient.findLatestSuccessfulBuild("Beta_Module_Build", "release/180.0.0"))
                 .thenReturn(Optional.empty());
-        when(teamCityClient.findLatestSuccessfulBuild("Gamma_Deployment_ReleaseProduction", "release/180.0.0"))
+        when(teamCityClient.findLatestSuccessfulBuild("Gamma_Module_Build", "release/180.0.0"))
                 .thenReturn(Optional.of(gammaSource));
         when(teamCityClient.triggerUatDeployBuild(
-                "MYPROJ_Alpha_Deploy_Uat", "release/180.0.0", "alpha", "180.0.0", alphaSource))
+                "Alpha_Deployment_DeployIntegration", "release/180.0.0", "alpha", "180.0.0", alphaSource))
                 .thenReturn(deployBuild);
+        when(teamCityClient.triggerUatDeployBuild(
+                "Gamma_Deployment_DeployIntegration", "release/180.0.0", "gamma", "180.0.0", gammaSource))
+                .thenThrow(new IntegrationException("deploy unavailable"));
         when(reportWriter.writeUatDeploymentReport(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Path.of("reports", "deployments", "uat-deployment-180.0.0.csv"));
 
@@ -94,7 +91,7 @@ class ReleaseDeploymentServiceTest {
                 .isEqualTo("Successful source build not found for branch release/180.0.0");
         assertThat(result.services().get(2).sourceBuildId()).isEqualTo(103L);
         assertThat(result.services().get(2).errorMessage())
-                .isEqualTo("UAT deploy buildTypeId is not configured for repo: gamma");
+                .isEqualTo("deploy unavailable");
         verify(teamCityClient, never()).getBuild(201);
     }
 
@@ -114,10 +111,10 @@ class ReleaseDeploymentServiceTest {
         TeamCityBuild source = build(101, "180.0.0.15");
         TeamCityBuild deployment = new TeamCityBuild(201, "queued", "UNKNOWN", "http://teamcity/201");
         when(releaseRepositoryProvider.getRepositoriesForRelease()).thenReturn(List.of("alpha"));
-        when(teamCityClient.findLatestSuccessfulBuild("Alpha_Deployment_ReleaseProduction", "release/180.0.0"))
+        when(teamCityClient.findLatestSuccessfulBuild("Alpha_Module_Build", "release/180.0.0"))
                 .thenReturn(Optional.of(source));
         when(teamCityClient.triggerUatDeployBuild(
-                "MYPROJ_Alpha_Deploy_Uat", "release/180.0.0", "alpha", "180.0.0", source))
+                "Alpha_Deployment_DeployIntegration", "release/180.0.0", "alpha", "180.0.0", source))
                 .thenReturn(deployment);
         when(reportWriter.writeUatDeploymentReport(org.mockito.ArgumentMatchers.any()))
                 .thenThrow(new IllegalStateException("disk is full"));
