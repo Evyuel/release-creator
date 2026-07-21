@@ -17,8 +17,6 @@ import org.springframework.web.client.RestClientException;
 
 @Component
 public class TeamCityClient {
-
-    private final TeamCityProperties properties;
     private final ProductionReleaseBuildService productionReleaseBuildService;
     private final RestClient restClient;
 
@@ -33,7 +31,6 @@ public class TeamCityClient {
             TeamCityProperties properties,
             ProductionReleaseBuildService productionReleaseBuildService,
             RestClient.Builder restClientBuilder) {
-        this.properties = properties;
         this.productionReleaseBuildService = productionReleaseBuildService;
         RestClient.Builder builder = restClientBuilder
                 .baseUrl(properties.baseUrl().toString())
