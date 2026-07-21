@@ -158,14 +158,14 @@ public class ReleaseFinalizationService {
                 execution.setDevelopPullRequest(developPullRequest);
                 log.info("EXISTING MASTER TO DEVELOP PR REUSED | pullRequestId={}", developPullRequest.id());
             } else {
-                final boolean masterAndDevelopHaveCommitsDiff;
+                final boolean fromMasterToDevelopHaveCommitsDiff;
                 try {
-                    masterAndDevelopHaveCommitsDiff = bitbucketClient.haveCommitsDiffer(MASTER_BRANCH, DEVELOP_BRANCH, repository);
+                    fromMasterToDevelopHaveCommitsDiff = bitbucketClient.haveCommitsDiffer(MASTER_BRANCH, DEVELOP_BRANCH, repository);
                 } catch (RuntimeException exception) {
                     return execution.fail(RepositoryFinalizationStatus.FAILED_UNEXPECTED_ERROR,
                             FinalizationStep.FIND_DEVELOP_PR, exception).toResult();
                 }
-                if (!masterAndDevelopHaveCommitsDiff) {
+                if (!fromMasterToDevelopHaveCommitsDiff) {
                     execution.status = releaseWasAlreadyMerged
                             ? RepositoryFinalizationStatus.SUCCESS_ALREADY_FINALIZED
                             : RepositoryFinalizationStatus.SUCCESS_DEVELOP_ALREADY_SYNCHRONIZED;
