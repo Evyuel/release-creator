@@ -8,6 +8,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.util.UriBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,6 +119,18 @@ public class BitbucketClient {
                 .queryParam("limit", 1)
                 .build(properties.projectKey(), repository));
         return changes.path("values").size() > 0;
+    }
+
+    public boolean haveCommitsDiffer(String fromRepo,
+                                    String toRepo,
+                                    String repository) {
+        JsonNode commitsDiffer = get(uriBuilder -> uriBuilder
+                .path("/rest/api/latest/projects/{projectKey}/repos/{repoSlug}/compare/commits")
+                .queryParam("from", fromRepo)
+                .queryParam("to", toRepo)
+                .queryParam("limit", 1)
+                .build(properties.projectKey(), repository));
+        return commitsDiffer.path("values").size() > 0;
     }
 
     public void createBranch(String repository, String branchName) {
