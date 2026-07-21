@@ -22,7 +22,7 @@ integrations:
   excluded-repositories:
     - "service1"
     - "service2"
-  build-name-expections:
+  build-name-exceptions:
     release-production-exceptions:
       service1: ser1_ReleaseProduction
       service2: service_2_ReleaseProduction
