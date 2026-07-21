@@ -35,8 +35,7 @@ class TeamCityClientTest {
                 URI.create("http://teamcity"),
                 "secret-token",
                 Duration.ofSeconds(1),
-                Duration.ofHours(1),
-                Map.of());
+                Duration.ofHours(1));
         client = new TeamCityClient(properties, new ProductionReleaseBuildService(), builder);
     }
 

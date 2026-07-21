@@ -48,8 +48,7 @@ class ReleaseServiceTest {
                 URI.create("http://teamcity"),
                 "token",
                 Duration.ofMillis(1),
-                Duration.ofSeconds(2),
-                java.util.Map.of());
+                Duration.ofSeconds(2));
         org.mockito.Mockito.lenient().when(reportWriter.writeReleaseCreationReport(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Path.of("reports", "releases", "release.csv"));
         releaseService = new ReleaseService(
