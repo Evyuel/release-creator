@@ -160,7 +160,7 @@ public class ReleaseFinalizationService {
             } else {
                 final boolean masterAndDevelopHaveCommitsDiff;
                 try {
-                    masterAndDevelopHaveCommitsDiff = bitbucketClient.haveCommitsDiffer(DEVELOP_BRANCH, MASTER_BRANCH, repository);
+                    masterAndDevelopHaveCommitsDiff = bitbucketClient.haveCommitsDiffer(MASTER_BRANCH, DEVELOP_BRANCH, repository);
                 } catch (RuntimeException exception) {
                     return execution.fail(RepositoryFinalizationStatus.FAILED_UNEXPECTED_ERROR,
                             FinalizationStep.FIND_DEVELOP_PR, exception).toResult();
