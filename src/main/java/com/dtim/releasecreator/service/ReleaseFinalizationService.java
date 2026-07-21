@@ -168,8 +168,8 @@ public class ReleaseFinalizationService {
                 if (!fromMasterToDevelopHaveCommitsDiff) {
                     execution.status = releaseWasAlreadyMerged
                             ? RepositoryFinalizationStatus.SUCCESS_ALREADY_FINALIZED
-                            : RepositoryFinalizationStatus.SUCCESS_DEVELOP_ALREADY_SYNCHRONIZED;
-                    log.info("DEVELOP ALREADY SYNCHRONIZED | status={}", execution.status);
+                            : RepositoryFinalizationStatus.SUCCESS_MASTER_ALREADY_SYNCHRONIZED;
+                    log.info("MASTER ALREADY SYNCHRONIZED | status={}", execution.status);
                     return execution.toResult();
                 }
                 try {
