@@ -1,12 +1,11 @@
 package com.dtim.releasecreator.controller;
 
+import com.dtim.releasecreator.dto.ReleaseDeploymentRequest;
 import com.dtim.releasecreator.dto.ReleaseDeploymentResult;
 import com.dtim.releasecreator.service.ReleaseDeploymentService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/releases")
@@ -18,9 +17,8 @@ public class ReleaseDeploymentController {
         this.releaseDeploymentService = releaseDeploymentService;
     }
 
-    @PostMapping("/{releaseVersion}/deployments/uat")
-    public ResponseEntity<ReleaseDeploymentResult> deployToUat(
-            @PathVariable String releaseVersion) {
-        return ResponseEntity.ok(releaseDeploymentService.deployToUat(releaseVersion));
+    @PostMapping("/deployments/uat")
+    public ResponseEntity<ReleaseDeploymentResult> deployToUat(@Valid @RequestBody ReleaseDeploymentRequest request) {
+        return ResponseEntity.ok(releaseDeploymentService.deployToUat(request.releaseVersion()));
     }
 }

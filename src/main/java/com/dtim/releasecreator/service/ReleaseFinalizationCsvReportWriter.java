@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReleaseFinalizationCsvReportWriter {
 
-    private static final String HEADER = "operationId;releaseNumber;finalizationStatus;startedAt;finishedAt;durationMs;"
+    private static final String HEADER = "operationId;releaseVersion;finalizationStatus;startedAt;finishedAt;durationMs;"
             + "repoSlug;repositoryStatus;releaseBranch;releasePullRequestId;releasePullRequestUrl;"
             + "releasePullRequestStatus;releasePullRequestMerged;developPullRequestId;developPullRequestUrl;"
             + "developPullRequestStatus;developPullRequestCreated;developPullRequestMerged;errorStep;errorMessage";

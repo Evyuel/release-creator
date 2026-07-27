@@ -43,7 +43,7 @@ public class ReleaseDeploymentService {
     }
 
     public ReleaseDeploymentResult deployToUat(String releaseVersion) {
-        try (MDC.MDCCloseable ignored = MDC.putCloseable("releaseNumber", releaseVersion)) {
+        try (MDC.MDCCloseable ignored = MDC.putCloseable("releaseVersion", releaseVersion)) {
             releaseValidator.validateVersion(releaseVersion);
             String releaseBranch = RELEASE_BRANCH_PREFIX + releaseVersion;
             logStart(releaseVersion, releaseBranch);
@@ -98,7 +98,6 @@ public class ReleaseDeploymentService {
             log.info("[2/2] Triggering UAT deploy build");
             TeamCityBuild deploymentBuild = teamCityClient.triggerUatDeployBuild(
                     productionReleaseBuildService.getTST1DeployTypeForRepo(repository),
-                    releaseBranch,
                     repository,
                     releaseVersion,
                     sourceBuild);

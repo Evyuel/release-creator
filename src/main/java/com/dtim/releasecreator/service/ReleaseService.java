@@ -64,12 +64,12 @@ public class ReleaseService {
 
         Instant startedAt = Instant.now();
         String operationId = UUID.randomUUID().toString().substring(0, 8);
-        try (MDC.MDCCloseable ignored = MDC.putCloseable("releaseNumber", releaseNumber)) {
+        try (MDC.MDCCloseable ignored = MDC.putCloseable("releaseVersion", releaseNumber)) {
             log.info(SEPARATOR);
-            log.info("RELEASE STARTED | releaseNumber={}, releaseTaskNumber={}", releaseNumber, releaseTaskNumber);
+            log.info("RELEASE STARTED | releaseVersion={}, releaseTaskNumber={}", releaseNumber, releaseTaskNumber);
             releaseValidator.validateVersion(releaseNumber);
             releaseValidator.validateTaskNumber(releaseTaskNumber);
-            log.info("RELEASE VALIDATED | releaseNumber={}, releaseTaskNumber={}", releaseNumber, releaseTaskNumber);
+            log.info("RELEASE VALIDATED | releaseVersion={}, releaseTaskNumber={}", releaseNumber, releaseTaskNumber);
 
             List<String> repositories = releaseRepositoryProvider.getRepositoriesForRelease();
             String branchName = RELEASE_BRANCH_PREFIX + releaseNumber;

@@ -53,7 +53,7 @@ class ReleaseFinalizationCsvReportWriterTest {
         assertThat(report.getFileName().toString())
                 .isEqualTo("release-finalizing-181.0.0-20260715-102030-f82ab3c1.csv");
         assertThat(lines).hasSize(2);
-        assertThat(lines.get(0)).startsWith("operationId;releaseNumber;finalizationStatus");
+        assertThat(lines.get(0)).startsWith("operationId;releaseVersion;finalizationStatus");
         assertThat(lines.get(1)).contains(";orders;FAILED_DEVELOP_PR_MERGE;release/181.0.0;")
                 .endsWith(";MERGE_DEVELOP_PR;\"conflict; approval required\"");
     }

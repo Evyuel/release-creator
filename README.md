@@ -56,7 +56,7 @@ Create a release:
 ```shell
 curl -X POST http://localhost:8080/api/v1/releases \
   -H "Content-Type: application/json" \
-  -d '{"releaseNumber":"180.0.0"}'
+  -d '{"releaseVersion":"180.0.0"}'
 ```
 
 Deploy release artifacts to UAT:

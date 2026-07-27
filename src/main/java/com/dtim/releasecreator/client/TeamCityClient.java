@@ -108,22 +108,16 @@ public class TeamCityClient {
 
     public TeamCityBuild triggerUatDeployBuild(
             String deployBuildTypeId,
-            String branchName,
             String repository,
             String releaseVersion,
             TeamCityBuild sourceBuild) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("buildType", Map.of("id", deployBuildTypeId));
-        body.put("branchName", branchName);
         body.put("comment", Map.of(
                 "text", "Deploy " + repository + " release " + releaseVersion + " to UAT"));
         body.put("properties", Map.of("property", List.of(
-                teamCityProperty("env.ENVIRONMENT", "UAT"),
-                teamCityProperty("env.RELEASE_VERSION", releaseVersion),
-                teamCityProperty("env.SERVICE_NAME", repository),
-                teamCityProperty("env.RELEASE_BRANCH", branchName),
-                teamCityProperty("env.SOURCE_BUILD_ID", Long.toString(sourceBuild.id())),
-                teamCityProperty("env.SOURCE_BUILD_NUMBER", sourceBuild.number()))));
+                teamCityProperty("ansible_version_tag", sourceBuild.number())
+        )));
         try {
             JsonNode response = restClient.post()
                     .uri("/app/rest/buildQueue")

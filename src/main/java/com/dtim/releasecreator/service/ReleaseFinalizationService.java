@@ -56,10 +56,10 @@ public class ReleaseFinalizationService {
 
         Instant startedAt = Instant.now();
         String operationId = UUID.randomUUID().toString().substring(0, 8);
-        try (MDC.MDCCloseable releaseMdc = MDC.putCloseable("releaseNumber", releaseNumber);
+        try (MDC.MDCCloseable releaseMdc = MDC.putCloseable("releaseVersion", releaseNumber);
                 MDC.MDCCloseable operationMdc = MDC.putCloseable("operationId", operationId)) {
             log.info(SEPARATOR);
-            log.info("RELEASE FINALIZATION STARTED | operationId={} releaseNumber={}", operationId, releaseNumber);
+            log.info("RELEASE FINALIZATION STARTED | operationId={} releaseVersion={}", operationId, releaseNumber);
             String releaseBranch = RELEASE_BRANCH_PREFIX + releaseNumber;
             List<String> repositories = releaseRepositoryProvider.getRepositoriesForRelease();
             List<RepositoryFinalizationResult> results = new ArrayList<>();
@@ -243,7 +243,7 @@ public class ReleaseFinalizationService {
 
     private void logSummary(ReleaseFinalizationResult result) {
         log.info(SEPARATOR);
-        log.info("RELEASE FINALIZATION FINISHED | operationId={} releaseNumber={} status={} durationMs={} "
+        log.info("RELEASE FINALIZATION FINISHED | operationId={} releaseVersion={} status={} durationMs={} "
                         + "repositories={} successful={} skipped={} failed={} csvReport={}",
                 result.operationId(), result.releaseNumber(), result.status(), result.durationMillis(),
                 result.totalRepositories(), result.successfulCount(), result.skippedCount(),
