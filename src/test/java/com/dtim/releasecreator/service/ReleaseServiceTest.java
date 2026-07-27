@@ -55,7 +55,7 @@ class ReleaseServiceTest {
                 bitbucketClient,
                 teamCityClient,
                 properties,
-                new ReleaseVersionValidator(),
+                new ReleaseValidator(),
                 new ReleaseRepositoryProvider(bitbucketClient, new IntegrationsProperties(List.of())),
                 reportWriter);
     }

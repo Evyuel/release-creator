@@ -5,6 +5,8 @@ spring:
     name: release-creator
   profiles:
     active: local
+validation:
+  task-number-pattern: ^TTTPLN-\d+$
 
 integrations:
   bitbucket:

@@ -31,25 +31,25 @@ public class ReleaseFinalizationService {
     private static final String DEVELOP_BRANCH = "develop";
     private static final String SEPARATOR = "================================================================================";
 
-    private final ReleaseVersionValidator releaseVersionValidator;
+    private final ReleaseValidator releaseValidator;
     private final ReleaseRepositoryProvider releaseRepositoryProvider;
     private final BitbucketClient bitbucketClient;
     private final ReleaseFinalizationCsvReportWriter reportWriter;
     private final AtomicBoolean finalizationInProgress = new AtomicBoolean(false);
 
     public ReleaseFinalizationService(
-            ReleaseVersionValidator releaseVersionValidator,
+            ReleaseValidator releaseValidator,
             ReleaseRepositoryProvider releaseRepositoryProvider,
             BitbucketClient bitbucketClient,
             ReleaseFinalizationCsvReportWriter reportWriter) {
-        this.releaseVersionValidator = releaseVersionValidator;
+        this.releaseValidator = releaseValidator;
         this.releaseRepositoryProvider = releaseRepositoryProvider;
         this.bitbucketClient = bitbucketClient;
         this.reportWriter = reportWriter;
     }
 
     public ReleaseFinalizationResult finalizeRelease(String releaseNumber) {
-        releaseVersionValidator.validate(releaseNumber);
+        releaseValidator.validateVersion(releaseNumber);
         if (!finalizationInProgress.compareAndSet(false, true)) {
             throw new ReleaseInProgressException();
         }

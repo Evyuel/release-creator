@@ -10,6 +10,8 @@ import java.util.Map;
 import java.util.function.Function;
 
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.util.UriBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,10 +135,16 @@ public class BitbucketClient {
         return commitsDiffer.path("values").size() > 0;
     }
 
-    public void createBranch(String repository, String branchName) {
+    public void createBranchFromDevelop(String repository, String branchName) {
+        createBranch(repository, branchName, properties.developBranch());
+    }
+
+    public void createBranch(String repository,
+                             String branchName,
+                             String fromBranch) {
         Map<String, Object> body = Map.of(
                 "name", branchName,
-                "startPoint", "refs/heads/" + properties.developBranch());
+                "startPoint", "refs/heads/" + fromBranch);
         post(uriBuilder -> uriBuilder
                 .path("/rest/api/1.0/projects/{projectKey}/repos/{repository}/branches")
                 .build(properties.projectKey(), repository), body);
@@ -281,6 +289,55 @@ public class BitbucketClient {
         } catch (RestClientException exception) {
             throw new IntegrationException("Bitbucket request failed: " + exception.getMessage(), exception);
         }
+    }
+
+    public String getRawFile(String repository,
+                             String filePath,
+                             String branchName) {
+        return restClient.get().uri(uriBuilder ->
+                        uriBuilder
+                                .path("rest/api/1.0/projects/{project}/repos/{repository}/raw/{filePath}")
+                                .queryParam("at", branchName)
+                                .build(properties.projectKey(), repository, filePath)
+                )
+                .retrieve()
+                .body(String.class);
+    }
+
+    public void commitUpdatedFile(String repository,
+                                  String filePath,
+                                  String branchName,
+                                  String fileContent,
+                                  String commitMessage) {
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        form.add("branch", branchName);
+        form.add("content", fileContent);
+        form.add("message", commitMessage);
+        form.add("sourceCommitId", getLastCommitId(repository, filePath, branchName));
+
+        restClient.put()
+                .uri("/rest/api/latest/projects/{project}/repos/{repository}/browse/{filePath}",
+                        properties.projectKey(), repository, filePath)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(form)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    private String getLastCommitId(String repository,
+                                   String filePath,
+                                   String branchName) {
+        return get(
+                uriBuilder -> uriBuilder
+                        .path("rest/api/latest/projects/{project}/repos/{repository}/commits")
+                        .queryParam("path", filePath)
+                        .queryParam("until", branchName)
+                        .queryParam("limit", 1)
+                        .build(properties.projectKey(), repository)
+        )
+                .path("values")
+                .get(0)
+                .asText();
     }
 
     private static boolean hasText(String value) {

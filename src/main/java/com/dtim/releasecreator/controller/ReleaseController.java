@@ -22,6 +22,6 @@ public class ReleaseController {
 
     @PostMapping
     public ResponseEntity<ReleaseResult> createRelease(@Valid @RequestBody CreateReleaseRequest request) {
-        return ResponseEntity.ok(releaseService.createRelease(request.releaseNumber()));
+        return ResponseEntity.ok(releaseService.createRelease(request.releaseNumber(), request.releaseTaskNumber()));
     }
 }

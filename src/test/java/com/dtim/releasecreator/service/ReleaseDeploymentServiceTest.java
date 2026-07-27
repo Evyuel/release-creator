@@ -9,16 +9,13 @@ import static org.mockito.Mockito.when;
 
 import com.dtim.releasecreator.client.TeamCityBuild;
 import com.dtim.releasecreator.client.TeamCityClient;
-import com.dtim.releasecreator.config.TeamCityProperties;
 import com.dtim.releasecreator.dto.DeploymentStatus;
 import com.dtim.releasecreator.dto.ReleaseDeploymentResult;
 import com.dtim.releasecreator.exception.InvalidReleaseNumberException;
 import com.dtim.releasecreator.exception.IntegrationException;
-import java.net.URI;
+
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ReleaseDeploymentServiceTest {
 
     @Mock
-    private ReleaseVersionValidator releaseVersionValidator;
+    private ReleaseValidator releaseValidator;
 
     @Mock
     private ReleaseRepositoryProvider releaseRepositoryProvider;
@@ -46,7 +43,7 @@ class ReleaseDeploymentServiceTest {
     @BeforeEach
     void setUp() {
         service = new ReleaseDeploymentService(
-                releaseVersionValidator,
+                releaseValidator,
                 releaseRepositoryProvider,
                 teamCityClient,
                 new ProductionReleaseBuildService(),
@@ -98,7 +95,7 @@ class ReleaseDeploymentServiceTest {
     @Test
     void validationFailureStopsTheWholeEndpoint() {
         org.mockito.Mockito.doThrow(new InvalidReleaseNumberException("bad"))
-                .when(releaseVersionValidator).validate("bad");
+                .when(releaseValidator).validateVersion("bad");
 
         assertThatThrownBy(() -> service.deployToUat("bad"))
                 .isInstanceOf(InvalidReleaseNumberException.class);

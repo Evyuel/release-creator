@@ -33,27 +33,31 @@ public class ReleaseService {
     private final BitbucketClient bitbucketClient;
     private final TeamCityClient teamCityClient;
     private final TeamCityProperties teamCityProperties;
-    private final ReleaseVersionValidator releaseVersionValidator;
+    private final ReleaseValidator releaseValidator;
     private final ReleaseRepositoryProvider releaseRepositoryProvider;
     private final ReleaseCreationCsvReportWriter reportWriter;
     private final AtomicBoolean releaseInProgress = new AtomicBoolean(false);
+    private final ReleaseSemVerCommitCreator releaseSemVerCommitCreator;
 
     public ReleaseService(
             BitbucketClient bitbucketClient,
             TeamCityClient teamCityClient,
             TeamCityProperties teamCityProperties,
-            ReleaseVersionValidator releaseVersionValidator,
+            ReleaseValidator releaseValidator,
             ReleaseRepositoryProvider releaseRepositoryProvider,
-            ReleaseCreationCsvReportWriter reportWriter) {
+            ReleaseCreationCsvReportWriter reportWriter,
+            ReleaseSemVerCommitCreator releaseSemVerCommitCreator) {
         this.bitbucketClient = bitbucketClient;
         this.teamCityClient = teamCityClient;
         this.teamCityProperties = teamCityProperties;
-        this.releaseVersionValidator = releaseVersionValidator;
+        this.releaseValidator = releaseValidator;
         this.releaseRepositoryProvider = releaseRepositoryProvider;
         this.reportWriter = reportWriter;
+        this.releaseSemVerCommitCreator = releaseSemVerCommitCreator;
     }
 
-    public ReleaseResult createRelease(String releaseNumber) {
+    public ReleaseResult createRelease(String releaseNumber,
+                                       String releaseTaskNumber) {
         if (!releaseInProgress.compareAndSet(false, true)) {
             throw new ReleaseInProgressException();
         }
@@ -62,9 +66,10 @@ public class ReleaseService {
         String operationId = UUID.randomUUID().toString().substring(0, 8);
         try (MDC.MDCCloseable ignored = MDC.putCloseable("releaseNumber", releaseNumber)) {
             log.info(SEPARATOR);
-            log.info("RELEASE STARTED | releaseNumber={}", releaseNumber);
-            releaseVersionValidator.validate(releaseNumber);
-            log.info("RELEASE VALIDATED | releaseNumber={}", releaseNumber);
+            log.info("RELEASE STARTED | releaseNumber={}, releaseTaskNumber={}", releaseNumber, releaseTaskNumber);
+            releaseValidator.validateVersion(releaseNumber);
+            releaseValidator.validateTaskNumber(releaseTaskNumber);
+            log.info("RELEASE VALIDATED | releaseNumber={}, releaseTaskNumber={}", releaseNumber, releaseTaskNumber);
 
             List<String> repositories = releaseRepositoryProvider.getRepositoriesForRelease();
             String branchName = RELEASE_BRANCH_PREFIX + releaseNumber;
@@ -72,7 +77,7 @@ public class ReleaseService {
 
             List<RepositoryExecution> executions = new ArrayList<>();
             for (String repository : repositories) {
-                executions.add(prepareRepository(repository, branchName, releaseNumber));
+                executions.add(prepareRepository(repository, branchName, releaseNumber, releaseTaskNumber));
             }
 
             waitForBuilds(executions, branchName);
@@ -104,7 +109,8 @@ public class ReleaseService {
     private RepositoryExecution prepareRepository(
             String repository,
             String branchName,
-            String releaseNumber) {
+            String releaseNumber,
+            String releaseTaskNumber) {
         RepositoryExecution execution = new RepositoryExecution(repository, branchName);
         try (MDC.MDCCloseable ignored = MDC.putCloseable("repository", repository)) {
             log.info(SEPARATOR);
@@ -116,8 +122,10 @@ public class ReleaseService {
             }
 
             log.info("CHANGES FOUND | comparing master..develop");
-            bitbucketClient.createBranch(repository, branchName);
+            bitbucketClient.createBranchFromDevelop(repository, branchName);
             log.info("BRANCH CREATED | branch={}", branchName);
+
+            releaseSemVerCommitCreator.addSemVerFeatCommitToRelease(repository, branchName, releaseNumber, releaseTaskNumber);
 
             PullRequestInfo pullRequest = bitbucketClient.createPullRequest(repository, branchName, releaseNumber);
             execution.pullRequestId = pullRequest.id();

@@ -28,7 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ReleaseFinalizationServiceTest {
 
     @Mock
-    private ReleaseVersionValidator validator;
+    private ReleaseValidator validator;
     @Mock
     private ReleaseRepositoryProvider repositoryProvider;
     @Mock
@@ -114,7 +114,7 @@ class ReleaseFinalizationServiceTest {
     @Test
     void rejectsInvalidVersionBeforeCallingIntegrations() {
         org.mockito.Mockito.doThrow(new InvalidReleaseNumberException("bad"))
-                .when(validator).validate("bad");
+                .when(validator).validateVersion("bad");
 
         assertThatThrownBy(() -> service.finalizeRelease("bad"))
                 .isInstanceOf(InvalidReleaseNumberException.class);

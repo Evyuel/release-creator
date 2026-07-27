@@ -2,7 +2,6 @@ package com.dtim.releasecreator.service;
 
 import com.dtim.releasecreator.client.TeamCityBuild;
 import com.dtim.releasecreator.client.TeamCityClient;
-import com.dtim.releasecreator.config.TeamCityProperties;
 import com.dtim.releasecreator.dto.DeploymentStatus;
 import com.dtim.releasecreator.dto.ReleaseDeploymentResult;
 import com.dtim.releasecreator.dto.ServiceDeploymentResult;
@@ -24,19 +23,19 @@ public class ReleaseDeploymentService {
     private static final String SEPARATOR = "================================================================================";
     private static final String REPOSITORY_SEPARATOR = "--------------------------------------------------------------------------------";
 
-    private final ReleaseVersionValidator releaseVersionValidator;
+    private final ReleaseValidator releaseValidator;
     private final ReleaseRepositoryProvider releaseRepositoryProvider;
     private final TeamCityClient teamCityClient;
     private final ProductionReleaseBuildService productionReleaseBuildService;
     private final ReleaseDeploymentCsvReportWriter reportWriter;
 
     public ReleaseDeploymentService(
-            ReleaseVersionValidator releaseVersionValidator,
+            ReleaseValidator releaseValidator,
             ReleaseRepositoryProvider releaseRepositoryProvider,
             TeamCityClient teamCityClient,
             ProductionReleaseBuildService productionReleaseBuildService,
             ReleaseDeploymentCsvReportWriter reportWriter) {
-        this.releaseVersionValidator = releaseVersionValidator;
+        this.releaseValidator = releaseValidator;
         this.releaseRepositoryProvider = releaseRepositoryProvider;
         this.teamCityClient = teamCityClient;
         this.productionReleaseBuildService = productionReleaseBuildService;
@@ -45,7 +44,7 @@ public class ReleaseDeploymentService {
 
     public ReleaseDeploymentResult deployToUat(String releaseVersion) {
         try (MDC.MDCCloseable ignored = MDC.putCloseable("releaseNumber", releaseVersion)) {
-            releaseVersionValidator.validate(releaseVersion);
+            releaseValidator.validateVersion(releaseVersion);
             String releaseBranch = RELEASE_BRANCH_PREFIX + releaseVersion;
             logStart(releaseVersion, releaseBranch);
 
