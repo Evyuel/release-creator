@@ -19,6 +19,7 @@ public class ReleaseSemVerCommitCreator {
                                              String releaseBranchName,
                                              String releaseNumber,
                                              String releaseTaskNumber) {
+        log.info("ADDING ADDITIONAL COMMIT FOR RELEASE");
         String additionalCommitBranchName = String.format(ADDITIONAL_COMMIT_BRANCH_NAME_PATTERN, releaseNumber);
         bitbucketClient.createBranch(repository, additionalCommitBranchName, releaseBranchName);
 
