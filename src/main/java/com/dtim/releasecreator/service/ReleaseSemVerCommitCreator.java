@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ReleaseSemVerCommitCreator {
     private static final String GIT_IGNORE_FILE_PATH = ".gitignore";
-    private static final String ADDITIONAL_COMMIT_BRANCH_NAME_PATTERN = "feature/prepare_for_%s_release";
+    private static final String ADDITIONAL_COMMIT_BRANCH_NAME_PATTERN = "release_prepare/%s";
     private static final String COMMIT_MESSAGE_PATTERN = "feat: %s: trigger semver for release %s";
     private final BitbucketClient bitbucketClient;
 
@@ -19,8 +19,7 @@ public class ReleaseSemVerCommitCreator {
                                              String releaseBranchName,
                                              String releaseNumber,
                                              String releaseTaskNumber) {
-        String releaseSimpleNumber = releaseNumber.split("\\.")[0];
-        String additionalCommitBranchName = String.format(ADDITIONAL_COMMIT_BRANCH_NAME_PATTERN, releaseSimpleNumber);
+        String additionalCommitBranchName = String.format(ADDITIONAL_COMMIT_BRANCH_NAME_PATTERN, releaseNumber);
         bitbucketClient.createBranch(repository, additionalCommitBranchName, releaseBranchName);
 
         String rawFile = bitbucketClient.getRawFile(repository, GIT_IGNORE_FILE_PATH, additionalCommitBranchName);
