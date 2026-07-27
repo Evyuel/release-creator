@@ -3,6 +3,7 @@ package com.dtim.releasecreator.client;
 import com.dtim.releasecreator.config.BitbucketProperties;
 import com.dtim.releasecreator.exception.IntegrationException;
 import com.fasterxml.jackson.databind.JsonNode;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.util.UriBuilder;
@@ -124,8 +126,8 @@ public class BitbucketClient {
     }
 
     public boolean haveCommitsDiffer(String fromRepo,
-                                    String toRepo,
-                                    String repository) {
+                                     String toRepo,
+                                     String repository) {
         JsonNode commitsDiffer = get(uriBuilder -> uriBuilder
                 .path("/rest/api/latest/projects/{projectKey}/repos/{repoSlug}/compare/commits")
                 .queryParam("from", fromRepo)
@@ -232,6 +234,19 @@ public class BitbucketClient {
         return toPullRequest(repository, response);
     }
 
+    public void deleteBranch(String repository,
+                             String branchName) {
+        delete(
+                uriBuilder -> uriBuilder
+                        .path("/rest/branch-utils/1.0/projects/{projectKey}/repos/{repository}/branches")
+                        .build(properties.projectKey(), repository),
+                Map.of(
+                        "name", "refs/heads/" + branchName,
+                        "dryRun", false
+                )
+        );
+    }
+
     private Map<String, Object> repositoryRef(String repository, String refId) {
         return Map.of(
                 "id", refId,
@@ -286,6 +301,20 @@ public class BitbucketClient {
                 throw new IntegrationException("Bitbucket returned an empty response");
             }
             return response;
+        } catch (RestClientException exception) {
+            throw new IntegrationException("Bitbucket request failed: " + exception.getMessage(), exception);
+        }
+    }
+
+    private void delete(Function<UriBuilder, java.net.URI> uri,
+                        Object body) {
+        try {
+            restClient.method(HttpMethod.DELETE)
+                    .uri(uri)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
         } catch (RestClientException exception) {
             throw new IntegrationException("Bitbucket request failed: " + exception.getMessage(), exception);
         }

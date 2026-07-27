@@ -37,6 +37,7 @@ public class ReleaseSemVerCommitCreator {
         );
 
         bitbucketClient.mergePullRequest(repository, pr);
+        bitbucketClient.deleteBranch(repository, additionalCommitBranchName);
         log.info("ADDITIONAL COMMIT WITH MESSAGE \"{}\" ADDED FOR RELEASE | pullRequestId={} url={}", commitMessage, pr.id(), pr.url());
     }
 }
