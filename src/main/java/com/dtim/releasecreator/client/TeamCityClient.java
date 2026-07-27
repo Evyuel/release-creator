@@ -4,6 +4,8 @@ import com.dtim.releasecreator.config.TeamCityProperties;
 import com.dtim.releasecreator.exception.IntegrationException;
 import com.dtim.releasecreator.service.ProductionReleaseBuildService;
 import com.fasterxml.jackson.databind.JsonNode;
+
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +13,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -32,9 +35,16 @@ public class TeamCityClient {
             ProductionReleaseBuildService productionReleaseBuildService,
             RestClient.Builder restClientBuilder) {
         this.productionReleaseBuildService = productionReleaseBuildService;
+
+        SimpleClientHttpRequestFactory requestFactory =
+                new SimpleClientHttpRequestFactory();
+
+        requestFactory.setConnectTimeout(Duration.ofSeconds(30));
+        requestFactory.setReadTimeout(Duration.ofMinutes(10));
         RestClient.Builder builder = restClientBuilder
                 .baseUrl(properties.baseUrl().toString())
-                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .requestFactory(requestFactory);
         if (properties.token() != null && !properties.token().isBlank()) {
             builder.defaultHeaders(headers -> headers.setBearerAuth(properties.token()));
         }

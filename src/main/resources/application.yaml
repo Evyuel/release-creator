@@ -8,6 +8,14 @@ spring:
 validation:
   task-number-pattern: ^TTTPLN-\d+$
 
+resilience4j:
+  ratelimiter:
+    instances:
+      bitbucket:
+        limit-for-period: 1
+        limit-refresh-period: 1s
+        timeout-duration: 10s
+
 integrations:
   bitbucket:
     base-url: http://localhost:7990

@@ -4,6 +4,7 @@ import com.dtim.releasecreator.config.BitbucketProperties;
 import com.dtim.releasecreator.exception.IntegrationException;
 import com.fasterxml.jackson.databind.JsonNode;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,6 +13,7 @@ import java.util.function.Function;
 
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.util.UriBuilder;
@@ -32,17 +34,26 @@ public class BitbucketClient {
 
     private final BitbucketProperties properties;
     private final RestClient restClient;
+    private final BitbucketRequestExecutor requestExecutor;
 
     @Autowired
-    public BitbucketClient(BitbucketProperties properties) {
-        this(properties, RestClient.builder());
+    public BitbucketClient(BitbucketProperties properties, BitbucketRequestExecutor requestExecutor) {
+        this(properties, RestClient.builder(), requestExecutor);
     }
 
-    BitbucketClient(BitbucketProperties properties, RestClient.Builder restClientBuilder) {
+    BitbucketClient(BitbucketProperties properties, RestClient.Builder restClientBuilder, BitbucketRequestExecutor requestExecutor) {
         this.properties = properties;
+        this.requestExecutor = requestExecutor;
+        SimpleClientHttpRequestFactory requestFactory =
+                new SimpleClientHttpRequestFactory();
+
+        requestFactory.setConnectTimeout(Duration.ofSeconds(30));
+        requestFactory.setReadTimeout(Duration.ofMinutes(10));
+
         RestClient.Builder builder = restClientBuilder
                 .baseUrl(properties.baseUrl().toString())
-                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .requestFactory(requestFactory);
 
         if (hasText(properties.token())) {
             if (hasText(properties.username())) {
@@ -277,7 +288,7 @@ public class BitbucketClient {
 
     private JsonNode get(Function<UriBuilder, java.net.URI> uri) {
         try {
-            JsonNode response = restClient.get().uri(uri).retrieve().body(JsonNode.class);
+            JsonNode response = requestExecutor.execute(() -> restClient.get().uri(uri).retrieve().body(JsonNode.class));
             if (response == null) {
                 throw new IntegrationException("Bitbucket returned an empty response");
             }
@@ -291,12 +302,13 @@ public class BitbucketClient {
             Function<UriBuilder, java.net.URI> uri,
             Object body) {
         try {
-            JsonNode response = restClient.post()
+            JsonNode response = requestExecutor.execute(() -> restClient.post()
                     .uri(uri)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(JsonNode.class)
+            );
             if (response == null) {
                 throw new IntegrationException("Bitbucket returned an empty response");
             }
@@ -309,12 +321,13 @@ public class BitbucketClient {
     private void delete(Function<UriBuilder, java.net.URI> uri,
                         Object body) {
         try {
-            restClient.method(HttpMethod.DELETE)
+            requestExecutor.execute(() -> restClient.method(HttpMethod.DELETE)
                     .uri(uri)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
-                    .toBodilessEntity();
+                    .toBodilessEntity()
+            );
         } catch (RestClientException exception) {
             throw new IntegrationException("Bitbucket request failed: " + exception.getMessage(), exception);
         }
@@ -323,15 +336,17 @@ public class BitbucketClient {
     public String getRawFile(String repository,
                              String filePath,
                              String branchName) {
-        return restClient.get().uri(uriBuilder ->
+        return requestExecutor.execute(() -> restClient.get().uri(uriBuilder ->
                         uriBuilder
                                 .path("rest/api/1.0/projects/{project}/repos/{repository}/raw/{filePath}")
                                 .queryParam("at", branchName)
                                 .build(properties.projectKey(), repository, filePath)
                 )
                 .retrieve()
-                .body(String.class);
+                .body(String.class)
+        );
     }
+
 
     public void commitUpdatedFile(String repository,
                                   String filePath,
@@ -344,13 +359,14 @@ public class BitbucketClient {
         form.add("message", commitMessage);
         form.add("sourceCommitId", getLastCommitId(repository, filePath, branchName));
 
-        restClient.put()
+        requestExecutor.execute(() -> restClient.put()
                 .uri("/rest/api/latest/projects/{project}/repos/{repository}/browse/{filePath}",
                         properties.projectKey(), repository, filePath)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(form)
                 .retrieve()
-                .toBodilessEntity();
+                .toBodilessEntity()
+        );
     }
 
     private String getLastCommitId(String repository,
