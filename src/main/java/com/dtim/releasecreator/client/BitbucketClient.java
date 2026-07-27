@@ -337,6 +337,7 @@ public class BitbucketClient {
         )
                 .path("values")
                 .get(0)
+                .get("id")
                 .asText();
     }
 
