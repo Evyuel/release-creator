@@ -6,11 +6,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReleaseSemVerCommitCreator {
-    private static final String GIT_IGNORE_FILE_PATH = ".gitignore";
+    private static final String RELEASE_FILE_PATH = ".release-creator";
     private static final String ADDITIONAL_COMMIT_BRANCH_NAME_PATTERN = "release_prepare/%s";
     private static final String COMMIT_MESSAGE_PATTERN = "feat: %s: trigger semver for release %s";
     private final BitbucketClient bitbucketClient;
@@ -22,12 +24,18 @@ public class ReleaseSemVerCommitCreator {
         log.info("ADDING ADDITIONAL COMMIT FOR RELEASE");
         String additionalCommitBranchName = String.format(ADDITIONAL_COMMIT_BRANCH_NAME_PATTERN, releaseNumber);
         bitbucketClient.createBranch(repository, additionalCommitBranchName, releaseBranchName);
-
-        String rawFile = bitbucketClient.getRawFile(repository, GIT_IGNORE_FILE_PATH, additionalCommitBranchName);
-
         String commitMessage = String.format(COMMIT_MESSAGE_PATTERN, releaseTaskNumber, releaseNumber);
-        bitbucketClient.commitUpdatedFile(repository, GIT_IGNORE_FILE_PATH, additionalCommitBranchName, rawFile + " ", commitMessage);
-        bitbucketClient.commitUpdatedFile(repository, GIT_IGNORE_FILE_PATH, additionalCommitBranchName, rawFile, commitMessage);
+
+        Optional<String> releaseFileContent = bitbucketClient.getRawFile(repository, RELEASE_FILE_PATH, additionalCommitBranchName);
+        releaseFileContent.ifPresentOrElse((fileContent) -> {
+                    bitbucketClient.commitUpdatedFile(repository, RELEASE_FILE_PATH, additionalCommitBranchName, releaseNumber, commitMessage);
+                    bitbucketClient.commitUpdatedFile(repository, RELEASE_FILE_PATH, additionalCommitBranchName, "", commitMessage);
+                },
+                () -> {
+                    bitbucketClient.addNewFile(repository, RELEASE_FILE_PATH, additionalCommitBranchName, releaseNumber, commitMessage);
+                    bitbucketClient.commitUpdatedFile(repository, RELEASE_FILE_PATH, additionalCommitBranchName, "", commitMessage);
+                }
+        );
 
         BitbucketPullRequest pr = bitbucketClient.createPullRequest(
                 repository,

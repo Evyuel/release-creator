@@ -5,17 +5,14 @@ import com.dtim.releasecreator.exception.IntegrationException;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.util.UriBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -333,31 +330,53 @@ public class BitbucketClient {
         }
     }
 
-    public String getRawFile(String repository,
-                             String filePath,
-                             String branchName) {
-        return requestExecutor.execute(() -> restClient.get().uri(uriBuilder ->
-                        uriBuilder
-                                .path("rest/api/1.0/projects/{project}/repos/{repository}/raw/{filePath}")
-                                .queryParam("at", branchName)
-                                .build(properties.projectKey(), repository, filePath)
-                )
-                .retrieve()
-                .body(String.class)
-        );
+    public Optional<String> getRawFile(String repository,
+                                       String filePath,
+                                       String branchName) {
+        try {
+            return Optional.ofNullable(requestExecutor.execute(() -> restClient.get().uri(uriBuilder ->
+                                            uriBuilder
+                                                    .path("rest/api/1.0/projects/{project}/repos/{repository}/raw/{filePath}")
+                                                    .queryParam("at", branchName)
+                                                    .build(properties.projectKey(), repository, filePath)
+                                    )
+                                    .retrieve()
+                                    .body(String.class)
+                    )
+            );
+        } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        }
     }
 
+    public void addNewFile(String repository,
+                           String filePath,
+                           String branchName,
+                           String fileContent,
+                           String commitMessage) {
+        putFile(repository, filePath, branchName, fileContent, commitMessage, true);
+    }
 
     public void commitUpdatedFile(String repository,
                                   String filePath,
                                   String branchName,
                                   String fileContent,
                                   String commitMessage) {
+        putFile(repository, filePath, branchName, fileContent, commitMessage, false);
+    }
+
+    private void putFile(String repository,
+                         String filePath,
+                         String branchName,
+                         String fileContent,
+                         String commitMessage, boolean isNew) {
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         form.add("branch", branchName);
         form.add("content", fileContent);
         form.add("message", commitMessage);
-        form.add("sourceCommitId", getLastCommitId(repository, filePath, branchName));
+        if (!isNew) {
+            form.add("sourceCommitId", getLastCommitId(repository, filePath, branchName));
+        }
 
         requestExecutor.execute(() -> restClient.put()
                 .uri("/rest/api/latest/projects/{project}/repos/{repository}/browse/{filePath}",

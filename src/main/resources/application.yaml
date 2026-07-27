@@ -12,7 +12,7 @@ resilience4j:
   ratelimiter:
     instances:
       bitbucket:
-        limit-for-period: 1
+        limit-for-period: 5
         limit-refresh-period: 1s
         timeout-duration: 10s
 
