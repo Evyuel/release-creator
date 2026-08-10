@@ -3,9 +3,12 @@ package com.dtim.releasecreator.controller;
 import com.dtim.releasecreator.dto.ApiError;
 import com.dtim.releasecreator.exception.IntegrationException;
 import com.dtim.releasecreator.exception.InvalidReleaseNumberException;
+import com.dtim.releasecreator.exception.InvalidReleaseTaskNumberException;
 import com.dtim.releasecreator.exception.ReleaseBranchConflictException;
 import com.dtim.releasecreator.exception.ReleaseInProgressException;
+import com.dtim.releasecreator.exception.ReleasePreflightException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +23,8 @@ public class ApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
-    @ExceptionHandler({InvalidReleaseNumberException.class, MethodArgumentNotValidException.class})
+    @ExceptionHandler({InvalidReleaseNumberException.class, InvalidReleaseTaskNumberException.class,
+            MethodArgumentNotValidException.class})
     public ResponseEntity<ApiError> badRequest(Exception exception) {
         List<String> details = exception instanceof MethodArgumentNotValidException validationException
                 ? validationException.getBindingResult().getFieldErrors().stream()
@@ -33,6 +37,17 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ReleaseBranchConflictException.class)
     public ResponseEntity<ApiError> releaseConflict(ReleaseBranchConflictException exception) {
         return error(HttpStatus.CONFLICT, "RELEASE_BRANCH_ALREADY_EXISTS", exception.getMessage(), exception.getRepositories());
+    }
+
+    @ExceptionHandler(ReleasePreflightException.class)
+    public ResponseEntity<ApiError> releasePreflight(ReleasePreflightException exception) {
+        List<String> details = new ArrayList<>();
+        details.add("csvReport=" + exception.getCsvReportPath());
+        exception.getFailures().forEach(failure -> details.add(
+                failure.repository() + ": " + failure.check() + " ["
+                        + failure.sourceBranch() + " -> " + failure.targetBranch() + "] "
+                        + failure.status() + " - " + failure.message()));
+        return error(HttpStatus.CONFLICT, "RELEASE_PREFLIGHT_FAILED", exception.getMessage(), details);
     }
 
     @ExceptionHandler(ReleaseInProgressException.class)

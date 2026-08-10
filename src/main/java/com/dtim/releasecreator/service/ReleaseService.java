@@ -72,6 +72,7 @@ public class ReleaseService {
             log.info("RELEASE VALIDATED | releaseVersion={}, releaseTaskNumber={}", releaseNumber, releaseTaskNumber);
 
             List<String> repositories = releaseRepositoryProvider.getRepositoriesForRelease();
+            releaseValidator.validateRepositoryPreflight(releaseNumber, repositories, operationId, startedAt);
             String branchName = RELEASE_BRANCH_PREFIX + releaseNumber;
             ensureReleaseBranchDoesNotExist(repositories, branchName);
 

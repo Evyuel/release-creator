@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.dtim.releasecreator.config.BitbucketProperties;
@@ -50,6 +51,17 @@ class BitbucketClientTest {
                 """, MediaType.APPLICATION_JSON));
 
         assertThat(client.getRepositoryNames()).containsExactly("active", "legacy-without-flags");
+        server.verify();
+    }
+
+    @Test
+    void detectsCommitsFromSourceBranchThatAreMissingFromTargetBranch() {
+        server.expect(requestTo("http://bitbucket/rest/api/latest/projects/MYPROJ/repos/orders/compare/commits"
+                        + "?from=master&to=develop&limit=1"))
+                .andExpect(method(GET))
+                .andRespond(withSuccess("{\"values\":[{\"id\":\"commit-id\"}]}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.haveCommitsDiffer("master", "develop", "orders")).isTrue();
         server.verify();
     }
 
