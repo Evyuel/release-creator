@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.dtim.releasecreator.config.BitbucketProperties;
 import com.dtim.releasecreator.exception.IntegrationException;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,8 +27,11 @@ class BitbucketClientTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new BitbucketClient(new BitbucketProperties(
-                URI.create("http://bitbucket"), "", "", "MYPROJ", "develop", "master"), builder);
+        client = new BitbucketClient(
+                new BitbucketProperties(
+                        URI.create("http://bitbucket"), "", "", "MYPROJ", "develop", "master"),
+                builder,
+                new BitbucketRequestExecutor(RateLimiterRegistry.ofDefaults()));
     }
 
     @Test

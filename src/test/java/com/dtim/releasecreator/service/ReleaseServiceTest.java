@@ -40,6 +40,9 @@ class ReleaseServiceTest {
     @Mock
     private ReleaseCreationCsvReportWriter reportWriter;
 
+    @Mock
+    private ReleaseSemVerCommitCreator releaseSemVerCommitCreator;
+
     private ReleaseService releaseService;
 
     @BeforeEach
@@ -55,14 +58,15 @@ class ReleaseServiceTest {
                 bitbucketClient,
                 teamCityClient,
                 properties,
-                new ReleaseValidator(),
+                new ReleaseValidator("^TTTPLN-\\d+$"),
                 new ReleaseRepositoryProvider(bitbucketClient, new IntegrationsProperties(List.of())),
-                reportWriter);
+                reportWriter,
+                releaseSemVerCommitCreator);
     }
 
     @Test
     void rejectsInvalidReleaseNumberBeforeCallingIntegrations() {
-        assertThatThrownBy(() -> releaseService.createRelease("18.0"))
+        assertThatThrownBy(() -> releaseService.createRelease("18.0", "TTTPLN-123"))
                 .isInstanceOf(InvalidReleaseNumberException.class);
 
         verifyNoInteractions(bitbucketClient, teamCityClient);
@@ -73,12 +77,12 @@ class ReleaseServiceTest {
         when(bitbucketClient.getRepositoryNames()).thenReturn(List.of("orders", "billing"));
         when(bitbucketClient.branchExists("billing", "release/180.0.0")).thenReturn(true);
 
-        assertThatThrownBy(() -> releaseService.createRelease("180.0.0"))
+        assertThatThrownBy(() -> releaseService.createRelease("180.0.0", "TTTPLN-123"))
                 .isInstanceOf(ReleaseBranchConflictException.class)
                 .satisfies(exception -> assertThat(((ReleaseBranchConflictException) exception).getRepositories())
                         .containsExactly("billing"));
 
-        verify(bitbucketClient, never()).createBranch("orders", "release/180.0.0");
+        verify(bitbucketClient, never()).createBranchFromDevelop("orders", "release/180.0.0");
         verifyNoInteractions(teamCityClient);
     }
 
@@ -94,7 +98,7 @@ class ReleaseServiceTest {
         when(teamCityClient.getBuild(100))
                 .thenReturn(new TeamCityBuild(100, "finished", "SUCCESS", "http://teamcity/100"));
 
-        ReleaseResult result = releaseService.createRelease("180.0.0");
+        ReleaseResult result = releaseService.createRelease("180.0.0", "TTTPLN-123");
 
         assertThat(result.status()).isEqualTo(ReleaseStatus.SUCCESS);
         assertThat(result.repositories())
@@ -121,7 +125,7 @@ class ReleaseServiceTest {
         when(teamCityClient.getBuild(101))
                 .thenReturn(new TeamCityBuild(101, "finished", "SUCCESS", "http://teamcity/101"));
 
-        ReleaseResult result = releaseService.createRelease("180.0.0");
+        ReleaseResult result = releaseService.createRelease("180.0.0", "TTTPLN-123");
 
         assertThat(result.status()).isEqualTo(ReleaseStatus.SUCCESS);
         assertThat(result.repositories().get(0).status()).isEqualTo(RepositoryReleaseStatus.BUILD_SUCCESS);

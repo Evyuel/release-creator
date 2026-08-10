@@ -7,6 +7,7 @@ public record ReleaseDeploymentResult(
         String environment,
         int totalServices,
         int startedCount,
+        int successfulCount,
         int failedCount,
         String csvReportPath,
         List<ServiceDeploymentResult> services) {
@@ -21,6 +22,7 @@ public record ReleaseDeploymentResult(
                 environment,
                 totalServices,
                 startedCount,
+                successfulCount,
                 failedCount,
                 path,
                 services);

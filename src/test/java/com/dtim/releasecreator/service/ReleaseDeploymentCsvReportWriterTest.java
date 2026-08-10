@@ -35,7 +35,7 @@ class ReleaseDeploymentCsvReportWriterTest {
                 null,
                 "Failure \"quoted\"\nnext line");
         ReleaseDeploymentResult result = new ReleaseDeploymentResult(
-                "180.0.0", "UAT", 1, 0, 1, null, List.of(service));
+                "180.0.0", "UAT", 1, 0, 0, 1, null, List.of(service));
 
         Path report = writer.writeUatDeploymentReport(result);
 

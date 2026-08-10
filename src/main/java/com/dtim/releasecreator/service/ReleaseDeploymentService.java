@@ -2,10 +2,12 @@ package com.dtim.releasecreator.service;
 
 import com.dtim.releasecreator.client.TeamCityBuild;
 import com.dtim.releasecreator.client.TeamCityClient;
+import com.dtim.releasecreator.config.TeamCityProperties;
 import com.dtim.releasecreator.dto.DeploymentStatus;
 import com.dtim.releasecreator.dto.ReleaseDeploymentResult;
 import com.dtim.releasecreator.dto.ServiceDeploymentResult;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +28,7 @@ public class ReleaseDeploymentService {
     private final ReleaseValidator releaseValidator;
     private final ReleaseRepositoryProvider releaseRepositoryProvider;
     private final TeamCityClient teamCityClient;
+    private final TeamCityProperties teamCityProperties;
     private final ProductionReleaseBuildService productionReleaseBuildService;
     private final ReleaseDeploymentCsvReportWriter reportWriter;
 
@@ -33,11 +36,13 @@ public class ReleaseDeploymentService {
             ReleaseValidator releaseValidator,
             ReleaseRepositoryProvider releaseRepositoryProvider,
             TeamCityClient teamCityClient,
+            TeamCityProperties teamCityProperties,
             ProductionReleaseBuildService productionReleaseBuildService,
             ReleaseDeploymentCsvReportWriter reportWriter) {
         this.releaseValidator = releaseValidator;
         this.releaseRepositoryProvider = releaseRepositoryProvider;
         this.teamCityClient = teamCityClient;
+        this.teamCityProperties = teamCityProperties;
         this.productionReleaseBuildService = productionReleaseBuildService;
         this.reportWriter = reportWriter;
     }
@@ -50,19 +55,26 @@ public class ReleaseDeploymentService {
 
             List<String> repositories = releaseRepositoryProvider.getRepositoriesForRelease();
             List<ServiceDeploymentResult> services = new ArrayList<>();
-            for (String repository : repositories) {
-                services.add(deployRepository(repository, releaseVersion, releaseBranch));
+            int stageNumber = 0;
+            List<DeploymentStage> stages = deploymentStages(repositories);
+            for (DeploymentStage stage : stages) {
+                stageNumber++;
+                services.addAll(deployStage(stage, stageNumber, stages.size(), releaseVersion, releaseBranch));
             }
 
             int startedCount = (int) services.stream()
-                    .filter(service -> service.status() == DeploymentStatus.STARTED)
+                    .filter(service -> service.teamCityDeployBuildId() != null)
+                    .count();
+            int successfulCount = (int) services.stream()
+                    .filter(service -> service.status() == DeploymentStatus.SUCCESS)
                     .count();
             ReleaseDeploymentResult result = new ReleaseDeploymentResult(
                     releaseVersion,
                     ENVIRONMENT,
                     services.size(),
                     startedCount,
-                    services.size() - startedCount,
+                    successfulCount,
+                    services.size() - successfulCount,
                     null,
                     services);
             result = writeReport(result);
@@ -71,11 +83,60 @@ public class ReleaseDeploymentService {
         }
     }
 
-    private ServiceDeploymentResult deployRepository(
+    private List<DeploymentStage> deploymentStages(List<String> repositories) {
+        List<String> otherRepositories = repositories.stream()
+                .filter(repository -> !isSpecialRepository(repository))
+                .toList();
+        List<DeploymentStage> stages = new ArrayList<>();
+        addStageIfPresent(stages, "CONFIG_SERVER", repositories, "config-server");
+        addStageIfPresent(stages, "BUSINESS_SETTINGS_API", repositories, "business-settings-api");
+        if (!otherRepositories.isEmpty()) {
+            stages.add(new DeploymentStage("OTHER_SERVICES", otherRepositories));
+        }
+        addStageIfPresent(stages, "GATEWAY", repositories, "gateway");
+        addStageIfPresent(stages, "FRONT_SERVICE", repositories, "front-service");
+        return stages;
+    }
+
+    private void addStageIfPresent(
+            List<DeploymentStage> stages,
+            String name,
+            List<String> repositories,
+            String repository) {
+        if (repositories.contains(repository)) {
+            stages.add(new DeploymentStage(name, List.of(repository)));
+        }
+    }
+
+    private boolean isSpecialRepository(String repository) {
+        return "config-server".equals(repository)
+                || "business-settings-api".equals(repository)
+                || "gateway".equals(repository)
+                || "front-service".equals(repository);
+    }
+
+    private List<ServiceDeploymentResult> deployStage(
+            DeploymentStage stage,
+            int stageNumber,
+            int totalStages,
+            String releaseVersion,
+            String releaseBranch) {
+        log.info("UAT DEPLOYMENT STAGE STARTED | stage={}/{} name={} repositories={}",
+                stageNumber, totalStages, stage.name(), stage.repositories());
+        List<DeploymentExecution> executions = stage.repositories().stream()
+                .map(repository -> startDeployment(repository, releaseVersion, releaseBranch))
+                .toList();
+        waitForDeployments(stage, executions);
+        log.info("UAT DEPLOYMENT STAGE FINISHED | stage={}/{} name={}",
+                stageNumber, totalStages, stage.name());
+        return executions.stream().map(DeploymentExecution::toResult).toList();
+    }
+
+    private DeploymentExecution startDeployment(
             String repository,
             String releaseVersion,
             String releaseBranch) {
-        TeamCityBuild sourceBuild = null;
+        DeploymentExecution execution = new DeploymentExecution(repository);
         try (MDC.MDCCloseable ignored = MDC.putCloseable("repository", repository)) {
             log.info(REPOSITORY_SEPARATOR);
             log.info("UAT DEPLOYMENT: {}", repository);
@@ -83,37 +144,91 @@ public class ReleaseDeploymentService {
 
             String sourceBuildTypeId = productionReleaseBuildService.getBuildTypeForRepo(repository);
             if (sourceBuildTypeId.isBlank()) {
-                return failed(repository, "Source buildTypeId is not configured for repo: " + repository);
+                return execution.fail("Source buildTypeId is not configured for repo: " + repository);
             }
 
-            log.info("[1/1] Searching latest successful TeamCity build for branch {}", releaseBranch);
+            log.info("[1/3] Searching latest successful TeamCity build for branch {}", releaseBranch);
             Optional<TeamCityBuild> sourceBuildOptional =
                     teamCityClient.findLatestSuccessfulBuild(sourceBuildTypeId, releaseBranch);
             if (sourceBuildOptional.isEmpty()) {
-                return failed(repository, "Successful source build not found for branch " + releaseBranch);
+                return execution.fail("Successful source build not found for branch " + releaseBranch);
             }
-            sourceBuild = sourceBuildOptional.get();
-            log.info("[OK] Source build found: id={}, number={}", sourceBuild.id(), sourceBuild.number());
+            execution.sourceBuild = sourceBuildOptional.get();
+            log.info("[OK] Source build found: id={}, number={}",
+                    execution.sourceBuild.id(), execution.sourceBuild.number());
 
-            log.info("[2/2] Triggering UAT deploy build");
-            TeamCityBuild deploymentBuild = teamCityClient.triggerUatDeployBuild(
+            log.info("[2/3] Triggering UAT deploy build");
+            execution.deploymentBuild = teamCityClient.triggerUatDeployBuild(
                     productionReleaseBuildService.getTST1DeployTypeForRepo(repository),
                     repository,
                     releaseVersion,
-                    sourceBuild);
+                    execution.sourceBuild);
             log.info("[OK] UAT deploy build started: id={}, url={}",
-                    deploymentBuild.id(), deploymentBuild.webUrl());
-            return ServiceDeploymentResult.started(repository, sourceBuild, deploymentBuild);
+                    execution.deploymentBuild.id(), execution.deploymentBuild.webUrl());
+            return execution;
         } catch (RuntimeException exception) {
             String message = safeMessage(exception);
             log.error("[FAILED] UAT deployment could not be started: {}", message, exception);
-            return ServiceDeploymentResult.failed(repository, sourceBuild, message);
+            return execution.fail(message);
         }
     }
 
-    private ServiceDeploymentResult failed(String repository, String message) {
-        log.error("[FAILED] {}", message);
-        return ServiceDeploymentResult.failed(repository, message);
+    private void waitForDeployments(DeploymentStage stage, List<DeploymentExecution> executions) {
+        List<DeploymentExecution> pending = executions.stream()
+                .filter(DeploymentExecution::pending)
+                .toList();
+        if (pending.isEmpty()) {
+            log.info("UAT DEPLOYMENT WAIT SKIPPED | stage={} no builds were queued", stage.name());
+            return;
+        }
+
+        Instant deadline = Instant.now().plus(teamCityProperties.waitTimeout());
+        log.info("[3/3] Waiting for UAT deployments | stage={} builds={} timeout={}",
+                stage.name(), pending.size(), teamCityProperties.waitTimeout());
+        while (pending.stream().anyMatch(DeploymentExecution::pending)) {
+            if (!Instant.now().isBefore(deadline)) {
+                pending.stream()
+                        .filter(DeploymentExecution::pending)
+                        .forEach(execution -> execution.fail(
+                                "Timed out waiting for TeamCity UAT deployment build "
+                                        + execution.deploymentBuild.id()));
+                break;
+            }
+
+            for (DeploymentExecution execution : pending) {
+                if (!execution.pending()) {
+                    continue;
+                }
+                try (MDC.MDCCloseable ignored = MDC.putCloseable("repository", execution.repository)) {
+                    TeamCityBuild build = teamCityClient.getBuild(execution.deploymentBuild.id());
+                    execution.deploymentBuild = build;
+                    if (!build.finished()) {
+                        log.debug("UAT deployment is running | buildId={} state={}", build.id(), build.state());
+                    } else if (build.successful()) {
+                        execution.status = DeploymentStatus.SUCCESS;
+                        log.info("[OK] UAT deployment succeeded | buildId={}", build.id());
+                    } else {
+                        execution.fail("TeamCity UAT deployment failed with status " + build.status());
+                    }
+                } catch (RuntimeException exception) {
+                    execution.fail("TeamCity UAT deployment polling failed: " + safeMessage(exception));
+                    log.error("[FAILED] Could not poll UAT deployment", exception);
+                }
+            }
+
+            if (pending.stream().anyMatch(DeploymentExecution::pending)) {
+                try {
+                    Thread.sleep(Math.max(1L, teamCityProperties.pollInterval().toMillis()));
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    pending.stream()
+                            .filter(DeploymentExecution::pending)
+                            .forEach(execution -> execution.fail(
+                                    "Interrupted while waiting for TeamCity UAT deployment"));
+                    break;
+                }
+            }
+        }
     }
 
     private ReleaseDeploymentResult writeReport(ReleaseDeploymentResult result) {
@@ -147,6 +262,7 @@ public class ReleaseDeploymentService {
         log.info("Environment     : {}", result.environment());
         log.info("Total services  : {}", result.totalServices());
         log.info("Started         : {}", result.startedCount());
+        log.info("Successful      : {}", result.successfulCount());
         log.info("Failed          : {}", result.failedCount());
         log.info("CSV report      : {}", result.csvReportPath());
         log.info(SEPARATOR);
@@ -158,5 +274,38 @@ public class ReleaseDeploymentService {
             return throwable.getClass().getSimpleName();
         }
         return message.length() > 500 ? message.substring(0, 500) : message;
+    }
+
+    private record DeploymentStage(String name, List<String> repositories) {
+    }
+
+    private static final class DeploymentExecution {
+        private final String repository;
+        private TeamCityBuild sourceBuild;
+        private TeamCityBuild deploymentBuild;
+        private DeploymentStatus status;
+        private String errorMessage;
+
+        private DeploymentExecution(String repository) {
+            this.repository = repository;
+        }
+
+        private boolean pending() {
+            return deploymentBuild != null && status == null;
+        }
+
+        private DeploymentExecution fail(String message) {
+            status = DeploymentStatus.FAILED;
+            errorMessage = message;
+            log.error("[FAILED] {}", message);
+            return this;
+        }
+
+        private ServiceDeploymentResult toResult() {
+            if (status == DeploymentStatus.SUCCESS) {
+                return ServiceDeploymentResult.successful(repository, sourceBuild, deploymentBuild);
+            }
+            return ServiceDeploymentResult.failed(repository, sourceBuild, deploymentBuild, errorMessage);
+        }
     }
 }

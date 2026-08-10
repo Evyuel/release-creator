@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.dtim.releasecreator.config.TeamCityProperties;
+import com.dtim.releasecreator.config.TeamCityBuildNameExceptionProperties;
 import com.dtim.releasecreator.service.ProductionReleaseBuildService;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -36,7 +37,11 @@ class TeamCityClientTest {
                 "secret-token",
                 Duration.ofSeconds(1),
                 Duration.ofHours(1));
-        client = new TeamCityClient(properties, new ProductionReleaseBuildService(), builder);
+        client = new TeamCityClient(
+                properties,
+                new ProductionReleaseBuildService(
+                        new TeamCityBuildNameExceptionProperties(Map.of(), Map.of(), Map.of())),
+                builder);
     }
 
     @Test
@@ -99,9 +104,7 @@ class TeamCityClientTest {
         server.expect(request -> assertThat(request.getURI().getPath()).isEqualTo("/app/rest/buildQueue"))
                 .andExpect(method(POST))
                 .andExpect(content().string(containsString("MYPROJ_Calc_Deploy_Uat")))
-                .andExpect(content().string(containsString("env.SOURCE_BUILD_ID")))
-                .andExpect(content().string(containsString("123456")))
-                .andExpect(content().string(containsString("env.SOURCE_BUILD_NUMBER")))
+                .andExpect(content().string(containsString("ansible_version_tag")))
                 .andExpect(content().string(containsString("180.0.0.15")))
                 .andRespond(withSuccess("""
                         {
@@ -117,7 +120,6 @@ class TeamCityClientTest {
 
         TeamCityBuild deployment = client.triggerUatDeployBuild(
                 "MYPROJ_Calc_Deploy_Uat",
-                "release/180.0.0",
                 "calc",
                 "180.0.0",
                 source);

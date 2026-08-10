@@ -56,7 +56,7 @@ class ReleaseFinalizationServiceTest {
                 .thenReturn(List.of(releaseOpen));
         when(bitbucketClient.mergePullRequest("orders", releaseOpen)).thenReturn(releaseMerged);
         when(bitbucketClient.findPullRequests("orders", "master", "develop")).thenReturn(List.of());
-        when(bitbucketClient.hasChanges("orders", "develop", "master")).thenReturn(true);
+        when(bitbucketClient.haveCommitsDiffer("master", "develop", "orders")).thenReturn(true);
         when(bitbucketClient.createPullRequest(any(), any(), any(), any(), any())).thenReturn(developOpen);
         when(bitbucketClient.mergePullRequest("orders", developOpen)).thenReturn(developMerged);
 
@@ -78,7 +78,6 @@ class ReleaseFinalizationServiceTest {
         when(bitbucketClient.findPullRequests("orders", "release/181.0.0", "master"))
                 .thenReturn(List.of(releaseMerged));
         when(bitbucketClient.findPullRequests("orders", "master", "develop")).thenReturn(List.of());
-        when(bitbucketClient.hasChanges("orders", "develop", "master")).thenReturn(false);
 
         ReleaseFinalizationResult result = service.finalizeRelease("181.0.0");
 
