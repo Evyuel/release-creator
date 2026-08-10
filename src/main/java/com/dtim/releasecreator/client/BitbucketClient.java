@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
@@ -334,16 +335,17 @@ public class BitbucketClient {
                                        String filePath,
                                        String branchName) {
         try {
-            return Optional.ofNullable(requestExecutor.execute(() -> restClient.get().uri(uriBuilder ->
-                                            uriBuilder
-                                                    .path("rest/api/1.0/projects/{project}/repos/{repository}/raw/{filePath}")
-                                                    .queryParam("at", branchName)
-                                                    .build(properties.projectKey(), repository, filePath)
-                                    )
-                                    .retrieve()
-                                    .body(String.class)
-                    )
+            String fileContent = requestExecutor.execute(() -> restClient.get().uri(uriBuilder ->
+                                    uriBuilder
+                                            .path("rest/api/1.0/projects/{project}/repos/{repository}/raw/{filePath}")
+                                            .queryParam("at", branchName)
+                                            .build(properties.projectKey(), repository, filePath)
+                            )
+                            .retrieve()
+                            .body(String.class)
             );
+            fileContent = StringUtils.isBlank(fileContent) ? "" : fileContent;
+            return Optional.of(fileContent);
         } catch (HttpClientErrorException.NotFound e) {
             return Optional.empty();
         }
