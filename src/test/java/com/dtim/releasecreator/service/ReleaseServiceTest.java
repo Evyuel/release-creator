@@ -13,6 +13,7 @@ import com.dtim.releasecreator.client.TeamCityBuild;
 import com.dtim.releasecreator.client.TeamCityClient;
 import com.dtim.releasecreator.config.TeamCityProperties;
 import com.dtim.releasecreator.config.IntegrationsProperties;
+import com.dtim.releasecreator.config.BitbucketProperties;
 import com.dtim.releasecreator.dto.ReleaseResult;
 import com.dtim.releasecreator.dto.ReleaseStatus;
 import com.dtim.releasecreator.dto.RepositoryReleaseStatus;
@@ -41,6 +42,9 @@ class ReleaseServiceTest {
     private ReleaseCreationCsvReportWriter reportWriter;
 
     @Mock
+    private ReleasePreflightCsvReportWriter preflightReportWriter;
+
+    @Mock
     private ReleaseSemVerCommitCreator releaseSemVerCommitCreator;
 
     private ReleaseService releaseService;
@@ -58,7 +62,12 @@ class ReleaseServiceTest {
                 bitbucketClient,
                 teamCityClient,
                 properties,
-                new ReleaseValidator("^TTTPLN-\\d+$"),
+                new ReleaseValidator(
+                        "^TTTPLN-\\d+$",
+                        bitbucketClient,
+                        new BitbucketProperties(
+                                URI.create("http://bitbucket"), "", "", "MYPROJ", "develop", "master"),
+                        preflightReportWriter),
                 new ReleaseRepositoryProvider(bitbucketClient, new IntegrationsProperties(List.of())),
                 reportWriter,
                 releaseSemVerCommitCreator);
@@ -75,6 +84,9 @@ class ReleaseServiceTest {
     @Test
     void abortsEntireReleaseWhenBranchAlreadyExists() {
         when(bitbucketClient.getRepositoryNames()).thenReturn(List.of("orders", "billing"));
+        when(bitbucketClient.branchExists("orders", "release/179.0.0")).thenReturn(false);
+        when(bitbucketClient.branchExists("billing", "release/179.0.0")).thenReturn(false);
+        when(bitbucketClient.branchExists("orders", "release/180.0.0")).thenReturn(false);
         when(bitbucketClient.branchExists("billing", "release/180.0.0")).thenReturn(true);
 
         assertThatThrownBy(() -> releaseService.createRelease("180.0.0", "TTTPLN-123"))
