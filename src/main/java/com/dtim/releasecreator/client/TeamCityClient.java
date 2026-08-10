@@ -27,7 +27,7 @@ public class TeamCityClient {
     public TeamCityClient(
             TeamCityProperties properties,
             ProductionReleaseBuildService productionReleaseBuildService) {
-        this(properties, productionReleaseBuildService, RestClient.builder());
+        this(properties, productionReleaseBuildService, defaultRestClientBuilder());
     }
 
     TeamCityClient(
@@ -36,19 +36,20 @@ public class TeamCityClient {
             RestClient.Builder restClientBuilder) {
         this.productionReleaseBuildService = productionReleaseBuildService;
 
-        SimpleClientHttpRequestFactory requestFactory =
-                new SimpleClientHttpRequestFactory();
-
-        requestFactory.setConnectTimeout(Duration.ofSeconds(30));
-        requestFactory.setReadTimeout(Duration.ofMinutes(10));
         RestClient.Builder builder = restClientBuilder
                 .baseUrl(properties.baseUrl().toString())
-                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-                .requestFactory(requestFactory);
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
         if (properties.token() != null && !properties.token().isBlank()) {
             builder.defaultHeaders(headers -> headers.setBearerAuth(properties.token()));
         }
         this.restClient = builder.build();
+    }
+
+    private static RestClient.Builder defaultRestClientBuilder() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(30));
+        requestFactory.setReadTimeout(Duration.ofMinutes(10));
+        return RestClient.builder().requestFactory(requestFactory);
     }
 
     public TeamCityBuild triggerBuild(String repository, String branchName) {

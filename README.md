@@ -62,7 +62,9 @@ curl -X POST http://localhost:8080/api/v1/releases \
 Deploy release artifacts to UAT:
 
 ```shell
-curl -X POST http://localhost:8080/api/releases/180.0.0/deployments/uat
+curl -X POST http://localhost:9999/api/releases/deployments/uat \
+  -H "Content-Type: application/json" \
+  -d '{"releaseVersion":"180.0.0"}'
 ```
 
 Finalize a release:
@@ -77,9 +79,17 @@ The operation is idempotent: an already merged release pull request is recognize
 
 Every completed finalization writes a separate UTF-8, semicolon-separated CSV report under `reports/release-finalizing`, for example `release-finalizing-181.0.0-20260715-132030-f82ab3c1.csv`. The response includes overall counters, PR identifiers and URLs, per-repository statuses, the failed step and `csvReportPath`. A CSV failure does not discard already completed Bitbucket operations.
 
-The UAT endpoint finds the latest successful finished source build for each release branch and queues the configured deploy build with source-build parameters. It does not wait for deploy completion. A failure in one repository is returned for that repository without stopping the others.
+The UAT endpoint finds the latest successful source build for every repository, starts the corresponding deployment and waits for its final TeamCity status. Repositories are processed in ordered stages:
 
-Every UAT deployment attempt also writes a UTF-8, semicolon-separated CSV report under `reports/deployments`. Values containing semicolons, quotes, or line breaks are CSV-escaped. If report writing fails, already queued deployments remain in the response and `csvReportPath` is `null`.
+1. `config-server`;
+2. `business-settings-api`;
+3. all other services as one batch;
+4. `gateway`;
+5. `front-service`.
+
+Every stage is completely finished before the next one starts. Services in the "all other" stage are queued together and then awaited as a group. A failed or timed-out deployment is recorded without preventing the following stage from running. The response keeps `startedCount` and additionally returns `successfulCount`; service statuses contain the final `SUCCESS` or `FAILED` result.
+
+Every UAT deployment attempt also writes a UTF-8, semicolon-separated CSV report under `reports/deployments`. The report is written only after all stages finish, so its service status is final. Values containing semicolons, quotes, or line breaks are CSV-escaped. If report writing fails, completed deployment results remain in the response and `csvReportPath` is `null`.
 
 Every release-creation attempt writes a separate UTF-8, semicolon-separated report under `reports/releases`, for example `release-creation-180.0.0-20260713-143015-a8f31c42.csv`. Its columns are:
 

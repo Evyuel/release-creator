@@ -35,22 +35,15 @@ public class BitbucketClient {
 
     @Autowired
     public BitbucketClient(BitbucketProperties properties, BitbucketRequestExecutor requestExecutor) {
-        this(properties, RestClient.builder(), requestExecutor);
+        this(properties, defaultRestClientBuilder(), requestExecutor);
     }
 
     BitbucketClient(BitbucketProperties properties, RestClient.Builder restClientBuilder, BitbucketRequestExecutor requestExecutor) {
         this.properties = properties;
         this.requestExecutor = requestExecutor;
-        SimpleClientHttpRequestFactory requestFactory =
-                new SimpleClientHttpRequestFactory();
-
-        requestFactory.setConnectTimeout(Duration.ofSeconds(30));
-        requestFactory.setReadTimeout(Duration.ofMinutes(10));
-
         RestClient.Builder builder = restClientBuilder
                 .baseUrl(properties.baseUrl().toString())
-                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-                .requestFactory(requestFactory);
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
 
         if (hasText(properties.token())) {
             if (hasText(properties.username())) {
@@ -60,6 +53,13 @@ public class BitbucketClient {
             }
         }
         this.restClient = builder.build();
+    }
+
+    private static RestClient.Builder defaultRestClientBuilder() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(30));
+        requestFactory.setReadTimeout(Duration.ofMinutes(10));
+        return RestClient.builder().requestFactory(requestFactory);
     }
 
     public List<String> getRepositoryNames() {
