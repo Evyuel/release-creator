@@ -24,6 +24,10 @@ public class ReleaseDeploymentService {
     private static final String ENVIRONMENT = "UAT";
     private static final String SEPARATOR = "================================================================================";
     private static final String REPOSITORY_SEPARATOR = "--------------------------------------------------------------------------------";
+    private static final String CONFIG_SERVER_REPO_NAME = "config-server";
+    private static final String BUSINESS_SETTINGS_API_REPO_NAME = "business-settings-api";
+    private static final String GATEWAY_REPO_NAME = "gateway";
+    private static final String FRONT_SERVICE_REPO_NAME = "front-service";
 
     private final ReleaseValidator releaseValidator;
     private final ReleaseRepositoryProvider releaseRepositoryProvider;
@@ -88,13 +92,13 @@ public class ReleaseDeploymentService {
                 .filter(repository -> !isSpecialRepository(repository))
                 .toList();
         List<DeploymentStage> stages = new ArrayList<>();
-        addStageIfPresent(stages, "CONFIG_SERVER", repositories, "config-server");
-        addStageIfPresent(stages, "BUSINESS_SETTINGS_API", repositories, "business-settings-api");
+        addStageIfPresent(stages, "CONFIG_SERVER", repositories, CONFIG_SERVER_REPO_NAME);
+        addStageIfPresent(stages, "BUSINESS_SETTINGS_API", repositories, BUSINESS_SETTINGS_API_REPO_NAME);
         if (!otherRepositories.isEmpty()) {
             stages.add(new DeploymentStage("OTHER_SERVICES", otherRepositories));
         }
-        addStageIfPresent(stages, "GATEWAY", repositories, "gateway");
-        addStageIfPresent(stages, "FRONT_SERVICE", repositories, "front-service");
+        addStageIfPresent(stages, "GATEWAY", repositories, GATEWAY_REPO_NAME);
+        addStageIfPresent(stages, "FRONT_SERVICE", repositories, FRONT_SERVICE_REPO_NAME);
         return stages;
     }
 
@@ -109,10 +113,10 @@ public class ReleaseDeploymentService {
     }
 
     private boolean isSpecialRepository(String repository) {
-        return "config-server".equals(repository)
-                || "business-settings-api".equals(repository)
-                || "gateway".equals(repository)
-                || "front-service".equals(repository);
+        return CONFIG_SERVER_REPO_NAME.equals(repository)
+                || BUSINESS_SETTINGS_API_REPO_NAME.equals(repository)
+                || GATEWAY_REPO_NAME.equals(repository)
+                || FRONT_SERVICE_REPO_NAME.equals(repository);
     }
 
     private List<ServiceDeploymentResult> deployStage(
