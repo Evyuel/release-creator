@@ -25,6 +25,7 @@ public class ReleaseDeploymentService {
     private static final String SEPARATOR = "================================================================================";
     private static final String REPOSITORY_SEPARATOR = "--------------------------------------------------------------------------------";
     private static final String CONFIG_SERVER_REPO_NAME = "config-server";
+    private static final String LIQUIBASE_REPO_NAME = "liquibase";
     private static final String BUSINESS_SETTINGS_API_REPO_NAME = "business-settings-api";
     private static final String GATEWAY_REPO_NAME = "gateway";
     private static final String FRONT_SERVICE_REPO_NAME = "front-service";
@@ -93,6 +94,7 @@ public class ReleaseDeploymentService {
                 .toList();
         List<DeploymentStage> stages = new ArrayList<>();
         addStageIfPresent(stages, "CONFIG_SERVER", repositories, CONFIG_SERVER_REPO_NAME);
+        addStageIfPresent(stages, "LIQUIBASE", repositories, LIQUIBASE_REPO_NAME);
         addStageIfPresent(stages, "BUSINESS_SETTINGS_API", repositories, BUSINESS_SETTINGS_API_REPO_NAME);
         if (!otherRepositories.isEmpty()) {
             stages.add(new DeploymentStage("OTHER_SERVICES", otherRepositories));
@@ -116,7 +118,8 @@ public class ReleaseDeploymentService {
         return CONFIG_SERVER_REPO_NAME.equals(repository)
                 || BUSINESS_SETTINGS_API_REPO_NAME.equals(repository)
                 || GATEWAY_REPO_NAME.equals(repository)
-                || FRONT_SERVICE_REPO_NAME.equals(repository);
+                || FRONT_SERVICE_REPO_NAME.equals(repository)
+                || LIQUIBASE_REPO_NAME.equals(repository);
     }
 
     private List<ServiceDeploymentResult> deployStage(
