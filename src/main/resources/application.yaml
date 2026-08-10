@@ -27,7 +27,7 @@ integrations:
   teamcity:
     base-url: http://localhost:8111
     token: ${TEAMCITY_TOKEN:}
-    poll-interval: 60s
+    poll-interval: 30s
     wait-timeout: 5h
   excluded-repositories:
     - "service1"
